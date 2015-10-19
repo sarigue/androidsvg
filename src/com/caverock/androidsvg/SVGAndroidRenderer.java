@@ -1,5 +1,6 @@
 /*
    Copyright 2013 Paul LeBeau, Cave Rock Software Ltd.
+   Copyright 2015 François RAOULT, Personal work.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -17,6 +18,9 @@
 package com.caverock.androidsvg;
 
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -37,6 +41,7 @@ import android.graphics.PathMeasure;
 import android.graphics.RadialGradient;
 import android.graphics.RectF;
 import android.graphics.Shader;
+import android.graphics.Bitmap.CompressFormat;
 import android.graphics.Shader.TileMode;
 import android.graphics.Typeface;
 import android.util.Base64;
@@ -91,6 +96,7 @@ public class SVGAndroidRenderer
    private Box      canvasViewPort;
    private float    dpi;    // dots per inch. Needed for accurate conversion of length values that have real world units, such as "cm".
    private boolean  directRenderingMode;
+   private Paint    emptyPaint = new Paint();
 
    // Renderer state
    private SVG                  document;
@@ -509,11 +515,11 @@ public class SVGAndroidRenderer
    }
 
 
+   @SuppressWarnings("unused")
    private static void  info(String format, Object... args)
    {
       Log.i(TAG, String.format(format, args));
    }
-
 
    //==============================================================================
    // Renderers for each element type
@@ -1875,7 +1881,15 @@ public class SVGAndroidRenderer
       PreserveAspectRatio  positioning = (obj.preserveAspectRatio != null) ? obj.preserveAspectRatio : PreserveAspectRatio.LETTERBOX;
 
       // Locate the referenced image
-      Bitmap  image = checkForImageDataURL(obj.href);
+      Bitmap image = obj.cacheBitmap;
+      if (image == null && obj.cacheFile != null && obj.cacheFile.exists())
+      {
+    	  image = BitmapFactory.decodeFile(obj.cacheFile.getAbsolutePath());
+      }
+      if (image == null)
+      {
+          image = checkForImageDataURL(obj.href);
+      }
       if (image == null)
       {
          SVGExternalFileResolver  fileResolver = document.getFileResolver();
@@ -1884,11 +1898,37 @@ public class SVGAndroidRenderer
 
          image = fileResolver.resolveImage(obj.href);
       }
+      else if (obj.cacheFile == null || ! obj.cacheFile.exists())
+      {
+    	  // Cache bitmap
+          int  comma = obj.href.indexOf(',');
+          String mime = obj.href.substring(6, comma).toLowerCase(Locale.getDefault());
+          if (mime.startsWith("image/jpg") || mime.startsWith("image/jpg"))
+          {
+        	try
+			{
+          	  File f = File.createTempFile("picture_"+obj.hashCode(), ".svg.jpg");
+        	  f.deleteOnExit();
+          	  FileOutputStream stream = new FileOutputStream(f);
+          	  image.compress(CompressFormat.JPEG, 100, stream);
+			  stream.close();
+			  obj.cacheFile = f;
+			}
+			catch (IOException e)
+			{
+				e.printStackTrace();
+			}
+         }
+      }
       if (image == null) {
          error("Could not locate image '%s'", obj.href);
          return;
       }
 
+      if (! image.equals(obj.cacheBitmap))
+      {
+    	  obj.cacheBitmap = image;
+      }
       updateStyleForElement(state, obj);
 
       if (!display())
@@ -1921,7 +1961,7 @@ public class SVGAndroidRenderer
 
       viewportFill();
 
-      canvas.drawBitmap(image, 0, 0, new Paint());
+      canvas.drawBitmap(image, 0, 0, emptyPaint);
 
       if (compositing)
          popLayer(obj);

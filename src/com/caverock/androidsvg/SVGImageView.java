@@ -1,5 +1,6 @@
 /*
    Copyright 2013 Paul LeBeau, Cave Rock Software Ltd.
+   Copyright 2015 François RAOULT, Personal work.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -21,10 +22,21 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 
+
+import com.caverock.androidsvg.SVG.Box;
+import com.caverock.androidsvg.SVG.Length;
+
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.TypedArray;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Picture;
+import android.graphics.Shader;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.PictureDrawable;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -46,6 +58,10 @@ import android.widget.ImageView;
 public class SVGImageView extends ImageView
 {
    private static Method  setLayerTypeMethod = null;
+
+   private SVG mSvg = null;
+   private SVGAndroidRenderer mRenderer = null;
+   private Matrix    mImageMatrixRevert = new Matrix();
 
    {
       try
@@ -76,15 +92,42 @@ public class SVGImageView extends ImageView
    }
 
    
-   private void  init(AttributeSet attrs, int defStyle)
+   @SuppressLint("NewApi")
+private void  init(AttributeSet attrs, int defStyle)
    {
-      if (isInEditMode())
-         return;
+	  // if (isInEditMode()) return;
 
       TypedArray a = getContext().getTheme()
                      .obtainStyledAttributes(attrs, R.styleable.SVGImageView, defStyle, 0);
       try
-      {
+      { 
+    	 
+    	 String background = a.getString(R.styleable.SVGImageView_background);
+    	 int backgrounddrawable  = a.getResourceId(R.styleable.SVGImageView_background, -1);
+    	 boolean usecheckerboard = a.getBoolean(R.styleable.SVGImageView_background, false);
+    	 
+    	 if (background != null)
+    	 {
+        	 if (background.startsWith("#"))
+        	 {
+            	 int backgroundcolor = a.getColor(R.styleable.SVGImageView_background, 0xFFFFFF);
+        		 setBackgroundColor(backgroundcolor);
+        	 }
+        	 else if ("true".equals(background) && usecheckerboard)
+        	 {
+        		 Bitmap bmp = BitmapFactory.decodeResource(getResources(), R.drawable.checkerboard);
+        		 BitmapDrawable drawable = new BitmapDrawable(getResources(), bmp);
+        		 drawable.setTileModeXY(Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);
+        		 setBackground(drawable);
+        		 //bmp.recycle();
+        		 //bmp = null;
+        	 }
+        	 else if (backgrounddrawable != - 1)
+        	 {
+        		 setBackgroundResource(backgrounddrawable);
+        	 }
+    	 }
+    	 
          int  resourceId = a.getResourceId(R.styleable.SVGImageView_svg, -1);
          if (resourceId != -1) {
             setImageResource(resourceId);
@@ -106,8 +149,51 @@ public class SVGImageView extends ImageView
          a.recycle();
       }
    }
+   
 
+   @Override
+	protected void onDraw(Canvas canvas)
+	{
+	   if (mSvg != null)
+	   { 
+		   canvas.save();
+		   canvas.setMatrix(getImageMatrix());
+		   getOnDrawRenderer(canvas).renderDocument(mSvg, null, null, true);
+		   canvas.restore();
+	   }
+	   else
+	   {
+		   super.onDraw(canvas);
+	   }
+	   getImageMatrix().invert(mImageMatrixRevert);
+	}
+   
 
+   private SVGAndroidRenderer getOnDrawRenderer(Canvas canvas)
+   {
+	   if (mRenderer == null)
+	   {
+		   SVG.Svg rootElement = mSvg.getRootElement();
+		   Length  width = rootElement.width;
+		   if (width != null)
+	       {
+	         float w = width.floatValue(mSvg.getRenderDPI());
+	         float h;
+	         Box  rootViewBox = rootElement.viewBox;
+	         if (rootViewBox != null)
+	         {
+	            h = w * rootViewBox.height / rootViewBox.width;
+	         }
+	         else
+	         {
+	            Length  height = rootElement.height;
+	            h = (height != null) ? height.floatValue(mSvg.getRenderDPI()) : w;
+	         }
+			   mRenderer = new SVGAndroidRenderer(canvas, new Box(0f, 0f, w, h), mSvg.getRenderDPI());
+	       }
+	   }
+	   return mRenderer;
+   }
 
    /**
     * Directly set the SVG.
@@ -119,6 +205,7 @@ public class SVGImageView extends ImageView
 
       setSoftwareLayerType();
       setImageDrawable(new PictureDrawable(mysvg.renderToPicture()));
+	  mSvg = mysvg;
    }
 
 
@@ -183,6 +270,7 @@ public class SVGImageView extends ImageView
          try
          {
             SVG  svg = SVG.getFromResource(getContext(), resourceId[0]);
+            mSvg = svg;
             return svg.renderToPicture();
          }
          catch (SVGParseException e)
@@ -209,6 +297,7 @@ public class SVGImageView extends ImageView
          try
          {
             SVG  svg = SVG.getFromAsset(getContext().getAssets(), filename[0]);
+            mSvg = svg;
             return svg.renderToPicture();
          }
          catch (SVGParseException e)
@@ -243,6 +332,7 @@ public class SVGImageView extends ImageView
          try
          {
             SVG  svg = SVG.getFromInputStream(is[0]);
+            mSvg = svg;
             return svg.renderToPicture();
          }
          catch (SVGParseException e)

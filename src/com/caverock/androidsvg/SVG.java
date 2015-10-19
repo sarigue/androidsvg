@@ -1,5 +1,6 @@
 /*
    Copyright 2013 Paul LeBeau, Cave Rock Software Ltd.
+   Copyright 2015 FranÃ§ois RAOULT, Personal work.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -17,8 +18,11 @@
 package com.caverock.androidsvg;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -32,10 +36,13 @@ import org.xml.sax.SAXException;
 import android.content.Context;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Picture;
 import android.graphics.RectF;
+import android.graphics.Bitmap.Config;
 import android.util.Log;
 
 import com.caverock.androidsvg.CSSParser.Ruleset;
@@ -107,7 +114,16 @@ public class SVG
    Map<String, SvgElementBase> idToElementMap = new HashMap<String, SvgElementBase>();
 
 
-   protected enum Unit
+   public enum OutputFormat
+   {
+	   jpg,
+	   webp,
+	   png,
+	   svg,
+	   svgz
+   }
+   
+   public enum Unit
    {
       px,
       em,
@@ -117,7 +133,10 @@ public class SVG
       mm,
       pt,
       pc,
-      percent
+      percent;
+      public String toString(){
+    	  return (percent.equals(this)) ? "%" : super.toString();
+      };
    }
 
 
@@ -468,11 +487,102 @@ public class SVG
       renderer.renderDocument(this, view.viewBox, view.preserveAspectRatio, true);
    }
 
+   
+   //===============================================================================
+   // SVG document write to a file or output stream
+
+   /*
+    * 
+    */
+   public void write(OutputStreamWriter writer) throws IOException
+   {
+	   SVGAndroidWriter.write(writer, this);
+   }
+   
+   /*
+    * 
+    */
+   public void write(OutputStream stream) throws IOException
+   {
+	   SVGAndroidWriter.write(stream, this);
+   }
+
+   /*
+    * 
+    */
+   public void write(File file) throws IOException
+   {
+	   SVGAndroidWriter.write(file, this);
+   }
+   
+   /*
+    * 
+    */
+   public void write(String path) throws IOException
+   {
+	   SVGAndroidWriter.write(new File(path), this);
+   }
+
+   /*
+    * 
+    */
+   public void write(File file, OutputFormat format) throws IOException
+   {
+	   SVGAndroidWriter.write(file, this, format);
+   }
+   
+   /*
+    * 
+    */
+   public void write(String path, OutputFormat format) throws IOException
+   {
+	   SVGAndroidWriter.write(new File(path), this, format);
+   }
+
+   /*
+    * 
+    */
+   public void write(File file, OutputFormat format, int backgroundColor) throws IOException
+   {
+	   SVGAndroidWriter.write(file, this, format, backgroundColor);
+   }
+   
+   /*
+    * 
+    */
+   public void write(String path, OutputFormat format, int backgroundColor) throws IOException
+   {
+	   SVGAndroidWriter.write(new File(path), this, format, backgroundColor);
+   }
 
    //===============================================================================
    // Other document utility API functions
 
+   public Bitmap getBitmap()
+   {
+	   return getBitmap((int)getDocumentWidth(), (int)getDocumentHeight());
+   }
 
+   public Bitmap getBitmap(int width, int height)
+   {
+	   return getBitmap(width, height, Color.WHITE);
+   }
+
+   public Bitmap getBitmap(int backgroundColor)
+   {
+	   return getBitmap((int)getDocumentWidth(), (int)getDocumentHeight(), backgroundColor);
+   }
+   
+
+   public Bitmap getBitmap(int width, int height, int backgroundColor)
+   {
+	   Bitmap bitmap = Bitmap.createBitmap(width, height, Config.ARGB_8888);
+	   Canvas canvas = new Canvas(bitmap);
+	   canvas.drawColor(backgroundColor);
+	   this.renderToCanvas(canvas);
+	   return bitmap;
+   }
+   
    /**
     * Returns the version number of this library.
     * 
@@ -796,7 +906,7 @@ public class SVG
    //===============================================================================
 
 
-   protected SVG.Svg  getRootElement()
+   public SVG.Svg  getRootElement()
    {
       return rootElement;
    }
@@ -854,19 +964,19 @@ public class SVG
    // CSS support methods
 
 
-   protected void  addCSSRules(Ruleset ruleset)
+   public void  addCSSRules(Ruleset ruleset)
    {
       this.cssRules.addAll(ruleset);
    }
 
 
-   protected List<CSSParser.Rule>  getCSSRules()
+   public List<CSSParser.Rule>  getCSSRules()
    {
       return this.cssRules.getRules();
    }
 
 
-   protected boolean  hasCSSRules()
+   public boolean  hasCSSRules()
    {
       return !this.cssRules.isEmpty();
    }
@@ -913,45 +1023,45 @@ public class SVG
    }
 
 
-   protected static final long SPECIFIED_FILL                  = (1<<0);
-   protected static final long SPECIFIED_FILL_RULE             = (1<<1);
-   protected static final long SPECIFIED_FILL_OPACITY          = (1<<2);
-   protected static final long SPECIFIED_STROKE                = (1<<3);
-   protected static final long SPECIFIED_STROKE_OPACITY        = (1<<4);
-   protected static final long SPECIFIED_STROKE_WIDTH          = (1<<5);
-   protected static final long SPECIFIED_STROKE_LINECAP        = (1<<6);
-   protected static final long SPECIFIED_STROKE_LINEJOIN       = (1<<7);
-   protected static final long SPECIFIED_STROKE_MITERLIMIT     = (1<<8);
-   protected static final long SPECIFIED_STROKE_DASHARRAY      = (1<<9);
-   protected static final long SPECIFIED_STROKE_DASHOFFSET     = (1<<10);
-   protected static final long SPECIFIED_OPACITY               = (1<<11);
-   protected static final long SPECIFIED_COLOR                 = (1<<12);
-   protected static final long SPECIFIED_FONT_FAMILY           = (1<<13);
-   protected static final long SPECIFIED_FONT_SIZE             = (1<<14);
-   protected static final long SPECIFIED_FONT_WEIGHT           = (1<<15);
-   protected static final long SPECIFIED_FONT_STYLE            = (1<<16);
-   protected static final long SPECIFIED_TEXT_DECORATION       = (1<<17);
-   protected static final long SPECIFIED_TEXT_ANCHOR           = (1<<18);
-   protected static final long SPECIFIED_OVERFLOW              = (1<<19);
-   protected static final long SPECIFIED_CLIP                  = (1<<20);
-   protected static final long SPECIFIED_MARKER_START          = (1<<21);
-   protected static final long SPECIFIED_MARKER_MID            = (1<<22);
-   protected static final long SPECIFIED_MARKER_END            = (1<<23);
-   protected static final long SPECIFIED_DISPLAY               = (1<<24);
-   protected static final long SPECIFIED_VISIBILITY            = (1<<25);
-   protected static final long SPECIFIED_STOP_COLOR            = (1<<26);
-   protected static final long SPECIFIED_STOP_OPACITY          = (1<<27);
-   protected static final long SPECIFIED_CLIP_PATH             = (1<<28);
-   protected static final long SPECIFIED_CLIP_RULE             = (1<<29);
-   protected static final long SPECIFIED_MASK                  = (1<<30);
-   protected static final long SPECIFIED_SOLID_COLOR           = (1L<<31);
-   protected static final long SPECIFIED_SOLID_OPACITY         = (1L<<32);
-   protected static final long SPECIFIED_VIEWPORT_FILL         = (1L<<33);
-   protected static final long SPECIFIED_VIEWPORT_FILL_OPACITY = (1L<<34);
-   protected static final long SPECIFIED_VECTOR_EFFECT         = (1L<<35);
-   protected static final long SPECIFIED_DIRECTION             = (1L<<36);
+   public static final long SPECIFIED_FILL                  = (1<<0);
+   public static final long SPECIFIED_FILL_RULE             = (1<<1);
+   public static final long SPECIFIED_FILL_OPACITY          = (1<<2);
+   public static final long SPECIFIED_STROKE                = (1<<3);
+   public static final long SPECIFIED_STROKE_OPACITY        = (1<<4);
+   public static final long SPECIFIED_STROKE_WIDTH          = (1<<5);
+   public static final long SPECIFIED_STROKE_LINECAP        = (1<<6);
+   public static final long SPECIFIED_STROKE_LINEJOIN       = (1<<7);
+   public static final long SPECIFIED_STROKE_MITERLIMIT     = (1<<8);
+   public static final long SPECIFIED_STROKE_DASHARRAY      = (1<<9);
+   public static final long SPECIFIED_STROKE_DASHOFFSET     = (1<<10);
+   public static final long SPECIFIED_OPACITY               = (1<<11);
+   public static final long SPECIFIED_COLOR                 = (1<<12);
+   public static final long SPECIFIED_FONT_FAMILY           = (1<<13);
+   public static final long SPECIFIED_FONT_SIZE             = (1<<14);
+   public static final long SPECIFIED_FONT_WEIGHT           = (1<<15);
+   public static final long SPECIFIED_FONT_STYLE            = (1<<16);
+   public static final long SPECIFIED_TEXT_DECORATION       = (1<<17);
+   public static final long SPECIFIED_TEXT_ANCHOR           = (1<<18);
+   public static final long SPECIFIED_OVERFLOW              = (1<<19);
+   public static final long SPECIFIED_CLIP                  = (1<<20);
+   public static final long SPECIFIED_MARKER_START          = (1<<21);
+   public static final long SPECIFIED_MARKER_MID            = (1<<22);
+   public static final long SPECIFIED_MARKER_END            = (1<<23);
+   public static final long SPECIFIED_DISPLAY               = (1<<24);
+   public static final long SPECIFIED_VISIBILITY            = (1<<25);
+   public static final long SPECIFIED_STOP_COLOR            = (1<<26);
+   public static final long SPECIFIED_STOP_OPACITY          = (1<<27);
+   public static final long SPECIFIED_CLIP_PATH             = (1<<28);
+   public static final long SPECIFIED_CLIP_RULE             = (1<<29);
+   public static final long SPECIFIED_MASK                  = (1<<30);
+   public static final long SPECIFIED_SOLID_COLOR           = (1L<<31);
+   public static final long SPECIFIED_SOLID_OPACITY         = (1L<<32);
+   public static final long SPECIFIED_VIEWPORT_FILL         = (1L<<33);
+   public static final long SPECIFIED_VIEWPORT_FILL_OPACITY = (1L<<34);
+   public static final long SPECIFIED_VECTOR_EFFECT         = (1L<<35);
+   public static final long SPECIFIED_DIRECTION             = (1L<<36);
 
-   protected static final long SPECIFIED_ALL = 0xffffffff;
+   public static final long SPECIFIED_ALL = 0xffffffff;
 
    protected static final long SPECIFIED_NON_INHERITING = SPECIFIED_DISPLAY | SPECIFIED_OVERFLOW | SPECIFIED_CLIP
                                                           | SPECIFIED_CLIP_PATH | SPECIFIED_OPACITY | SPECIFIED_STOP_COLOR
@@ -959,7 +1069,7 @@ public class SVG
                                                           | SPECIFIED_SOLID_OPACITY | SPECIFIED_VIEWPORT_FILL
                                                           | SPECIFIED_VIEWPORT_FILL_OPACITY | SPECIFIED_VECTOR_EFFECT;
 
-   protected static class  Style implements Cloneable
+   public static class  Style implements Cloneable
    {
       // Which properties have been explicitly specified by this element
       public long       specifiedFlags = 0;
@@ -967,7 +1077,7 @@ public class SVG
       public SvgPaint   fill;
       public FillRule   fillRule;
       public Float      fillOpacity;
-
+  
       public SvgPaint   stroke;
       public Float      strokeOpacity;
       public Length     strokeWidth;
@@ -978,9 +1088,9 @@ public class SVG
       public Length     strokeDashOffset;
 
       public Float      opacity; // master opacity of both stroke and fill
-
+      
       public Colour     color;
-
+      
       public List<String>    fontFamily;
       public Length          fontSize;
       public Integer         fontWeight;
@@ -1166,6 +1276,17 @@ public class SVG
             throw new InternalError(e.toString());
          }
       }
+
+      public void unsetSpecifiedFlag(long specifiedFlag)
+      {
+    	  specifiedFlags &= ~ specifiedFlag;
+      }
+      
+      public void setSpecifiedFlag(long specifiedFlag)
+      {
+    	  specifiedFlags |= specifiedFlag;
+      }
+
    }
 
 
@@ -1174,7 +1295,7 @@ public class SVG
    {
    }
 
-   protected static class Colour extends SvgPaint
+   public static class Colour extends SvgPaint
    {
       public int colour;
       
@@ -1204,10 +1325,16 @@ public class SVG
       {
          return instance;
       }
+      
+      @Override
+    public String toString()
+    {
+    	return "currentColor";
+    } 
    }
 
 
-   protected static class PaintReference extends SvgPaint
+   public static class PaintReference extends SvgPaint
    {
       public String    href;
       public SvgPaint  fallback;
@@ -1217,10 +1344,24 @@ public class SVG
          this.href = href;
          this.fallback = fallback;
       }
-      
+
+      public PaintReference(String href)
+      {
+    	  this (href, null);
+      }
+
       public String toString()
       {
-         return href + " " + fallback;
+         return href + (fallback==null ? "" : " " + fallback);
+      }
+      
+      public String getIdReference()
+      {
+    	  if (this.href.startsWith("#"))
+    	  {
+    		  return this.href.substring(1);
+    	  }
+    	  return null;
       }
    }
 
@@ -1228,10 +1369,10 @@ public class SVG
    /**
     * @hide
     */
-   protected static class Length implements Cloneable
+   public static class Length implements Cloneable
    {
-      float  value = 0;
-      Unit   unit = Unit.px;
+      public float  value = 0;
+      public Unit   unit = Unit.px;
 
       public Length(float value, Unit unit)
       {
@@ -1244,7 +1385,32 @@ public class SVG
          this.value = value;
          this.unit = Unit.px;
       }
+      
+      public Length(float value, String unit) throws SAXException
+      {
+    	  if ("%".equals(unit)) unit = "percent";
+    	  Unit u = Unit.valueOf(unit);
+    	  if (u != null){
+    		  this.value = value;
+    		  this.unit  = u;
+    	  }
+    	  else{
+    		  throw new SAXException("Unknown unit \""+unit+"\"");
+    	  }
+      }
 
+      public Length(String value) throws SAXException
+      {
+    	  Length l = parse(value);
+    	  this.value = l.value;
+    	  this.unit  = l.unit;
+      }
+      
+      public static Length parse(String value) throws SAXException
+      {
+    	  return SVGParser.parseLength(value);
+      }
+      
       public float floatValue()
       {
          return value;
@@ -1392,14 +1558,94 @@ public class SVG
    // Any object that can be part of the tree
    protected static class SvgObject
    {
-      public SVG           document;
+
+	  public SVG           document;
       public SvgContainer  parent;
 
       public String  toString()
       {
          return this.getClass().getSimpleName();
-         //return super.toString();
       }
+      
+      public void addAfter(SvgObject sibling) throws SAXException
+      {
+    	  SvgContainer parent = sibling.parent;
+    	  if (parent != null){
+    		  int index = parent.getChildren().indexOf(sibling);
+    		  if (index >= 0){
+    			  remove();
+    			  this.parent = parent;
+    			  parent.addChild(index+1, this);
+    		  }
+    		  else{
+    			  remove();
+    			  this.parent = parent;
+    			  parent.addChild(this);
+    		  }
+    	  }
+      }
+
+	  
+	  public SvgObject getNext()
+	  {
+		  if (this.parent != null)
+		  {
+			  List<SvgObject> children = this.parent.getChildren();
+			  int index = children.indexOf(this);
+			  if (index < children.size()-1)
+			  {
+				  return children.get(index+1);
+			  }
+			  return null;
+		  }
+		  return null;
+	  }
+	  
+	  
+	  public SvgObject getPrevious()
+	  {
+		  if (this.parent != null)
+		  {
+			  List<SvgObject> children = this.parent.getChildren();
+			  int index = children.indexOf(this);
+			  if (index > 0)
+			  {
+				  return children.get(index-1);
+			  }
+			  return null;
+		  }
+		  return null;
+	  }
+	  
+      public void addBefore(SvgObject sibling) throws SAXException
+      {
+    	  SvgContainer parent = sibling.parent;
+    	  if (parent != null){
+    		  int index = parent.getChildren().indexOf(sibling);
+    		  if (index >= 0){
+    			  remove();
+    			  this.parent = parent;
+    			  parent.addChild(index, this);
+    		  }
+    		  else{
+    			  remove();
+    			  this.parent = parent;
+    			  parent.addChild(this);
+    		  }
+    	  }
+      }
+      
+      public SvgObject remove()
+      {
+    	  if (this.parent != null)
+    	  {
+    		  this.parent.getChildren().remove(this);
+    		  this.parent = null;
+    		  return this;
+    	  }
+    	  return this;
+      }
+
    }
 
 
@@ -1408,16 +1654,35 @@ public class SVG
    {
       public String        id = null;
       public Boolean       spacePreserve = null;
-      public Style         baseStyle = null;   // style defined by explicit style attributes in the element (eg. fill="black")  
-      public Style         style = null;       // style expressed in a 'style' attribute (eg. style="fill:black")
-      public List<String>  classNames = null;  // contents of the 'class' attribute
+      public Style         baseStyle = null;                     // style defined by explicit style attributes in the element (eg. fill="black")  
+      public Style         style = new Style();                  // style expressed in a 'style' attribute (eg. style="fill:black")
+      public List<String>  classNames = new ArrayList<String>(); // contents of the 'class' attribute
+      
+      public void setStyle(String name, String value) throws SAXException
+      {
+    	  if (this.style == null) this.style = new Style();
+    	  SVGParser.processStyleProperty(this.style, name, value);
+      }
+
+      public void setStyles(String styleString) throws SAXException
+      {
+    	  if (this.style == null) this.style = new Style();
+    	  SVGParser.parseStyle(this, styleString);
+      }
+
+      public void clearStyle()
+      {
+    	  this.style = null;
+    	  this.baseStyle = null;
+      }
+      
    }
 
 
    // Any object in the tree that corresponds to an SVG element
    protected static class SvgElement extends SvgElementBase
    {
-      public Box     boundingBox = null;
+      public Box  boundingBox = null;
    }
 
 
@@ -1440,11 +1705,11 @@ public class SVG
    // Any element that can appear inside a <switch> element.
    protected static class  SvgConditionalElement extends SvgElement implements SvgConditional
    {
-      public Set<String>  requiredFeatures = null;
+      public Set<String>  requiredFeatures = new HashSet<String>();
       public String       requiredExtensions = null;
-      public Set<String>  systemLanguage = null;
-      public Set<String>  requiredFormats = null;
-      public Set<String>  requiredFonts = null;
+      public Set<String>  systemLanguage = new HashSet<String>();
+      public Set<String>  requiredFormats = new HashSet<String>();
+      public Set<String>  requiredFonts = new HashSet<String>();
 
       @Override
       public void setRequiredFeatures(Set<String> features) { this.requiredFeatures = features; }
@@ -1473,6 +1738,9 @@ public class SVG
    {
       public List<SvgObject>  getChildren();
       public void             addChild(SvgObject elem) throws SAXException;
+      public void             addChild(int index, SvgObject elem) throws SAXException;
+      public SvgObject        getElementById(String id) throws SAXException;
+      public List<SvgObject>  getElementsByTagName(Class<SvgObject> clazz) throws SAXException;
    }
 
 
@@ -1480,17 +1748,23 @@ public class SVG
    {
       public List<SvgObject> children = new ArrayList<SvgObject>();
 
-      public Set<String>  requiredFeatures = null;
+      public Set<String>  requiredFeatures = new HashSet<String>();
       public String       requiredExtensions = null;
-      public Set<String>  systemLanguage = null;
-      public Set<String>  requiredFormats = null;
-      public Set<String>  requiredFonts = null;
+      public Set<String>  systemLanguage = new HashSet<String>();
+      public Set<String>  requiredFormats = new HashSet<String>();
+      public Set<String>  requiredFonts = new HashSet<String>();
 
       @Override
       public List<SvgObject>  getChildren() { return children; }
       @Override
       public void addChild(SvgObject elem) throws SAXException  { children.add(elem); }
-
+      @Override
+      public void addChild(int index, SvgObject elem) throws SAXException { children.add(index, elem); }
+      @Override
+      public SvgObject getElementById(String id) throws SAXException { SvgObject elem = document.getElementById(id); return (elem.parent != null && elem.parent.equals(this.parent)) ? elem : null;  }
+      @Override
+      public List<SvgObject> getElementsByTagName(Class<SvgObject> clazz) throws SAXException { List<SvgObject> elemList = document.getElementsByTagName(clazz); List<SvgObject> list = new ArrayList<SvgObject>(); for(SvgObject o : elemList) if (o.parent != null && o.parent.equals(this.parent)){list.add(o);} return list;}
+      
       @Override
       public void setRequiredFeatures(Set<String> features) { this.requiredFeatures = features; }
       @Override
@@ -1532,7 +1806,7 @@ public class SVG
    }
 
 
-   protected static class Svg extends SvgViewBoxContainer
+   public static class Svg extends SvgViewBoxContainer
    {
       public Length  x;
       public Length  y;
@@ -1543,7 +1817,7 @@ public class SVG
 
 
    // An SVG element that can contain other elements.
-   protected static class Group extends SvgConditionalContainer implements HasTransform
+   public static class Group extends SvgConditionalContainer implements HasTransform
    {
       public Matrix  transform;
 
@@ -1559,13 +1833,13 @@ public class SVG
 
    // A <defs> object contains objects that are not rendered directly, but are instead
    // referenced from other parts of the file.
-   protected static class Defs extends Group implements NotDirectlyRendered
+   public static class Defs extends Group implements NotDirectlyRendered
    {
    }
 
 
    // One of the element types that can cause graphics to be drawn onto the target canvas.
-   // Specifically: ‘circle’, ‘ellipse’, ‘image’, ‘line’, ‘path’, ‘polygon’, ‘polyline’, ‘rect’, ‘text’ and ‘use’.
+   // Specifically: ï¿½circleï¿½, ï¿½ellipseï¿½, ï¿½imageï¿½, ï¿½lineï¿½, ï¿½pathï¿½, ï¿½polygonï¿½, ï¿½polylineï¿½, ï¿½rectï¿½, ï¿½textï¿½ and ï¿½useï¿½.
    protected static abstract class GraphicsElement extends SvgConditionalElement implements HasTransform
    {
       public Matrix  transform;
@@ -1575,7 +1849,7 @@ public class SVG
    }
 
 
-   protected static class Use extends Group
+   public static class Use extends Group
    {
       public String  href;
       public Length  x;
@@ -1585,14 +1859,14 @@ public class SVG
    }
 
 
-   protected static class Path extends GraphicsElement
+   public static class Path extends GraphicsElement
    {
       public PathDefinition  d;
       public Float           pathLength;
    }
 
 
-   protected static class Rect extends GraphicsElement
+   public static class Rect extends GraphicsElement
    {
       public Length  x;
       public Length  y;
@@ -1603,7 +1877,7 @@ public class SVG
    }
 
 
-   protected static class Circle extends GraphicsElement
+   public static class Circle extends GraphicsElement
    {
       public Length  cx;
       public Length  cy;
@@ -1611,7 +1885,7 @@ public class SVG
    }
 
 
-   protected static class Ellipse extends GraphicsElement
+   public static class Ellipse extends GraphicsElement
    {
       public Length  cx;
       public Length  cy;
@@ -1620,7 +1894,7 @@ public class SVG
    }
 
 
-   protected static class Line extends GraphicsElement
+   public static class Line extends GraphicsElement
    {
       public Length  x1;
       public Length  y1;
@@ -1629,13 +1903,13 @@ public class SVG
    }
 
 
-   protected static class PolyLine extends GraphicsElement
+   public static class PolyLine extends GraphicsElement
    {
       public float[]  points;
    }
 
 
-   protected static class Polygon extends PolyLine
+   public static class Polygon extends PolyLine
    {
    }
 
@@ -1666,16 +1940,69 @@ public class SVG
    }
 
 
-   protected static class  TextPositionedContainer extends TextContainer
+   public static class  TextPositionedContainer extends TextContainer
    {
-      public List<Length>  x;
-      public List<Length>  y;
-      public List<Length>  dx;
-      public List<Length>  dy;
+      public List<Length>  x = new ArrayList<Length>();
+      public List<Length>  y = new ArrayList<Length>();
+      public List<Length>  dx = new ArrayList<Length>();
+      public List<Length>  dy = new ArrayList<Length>();
+      
+      public void setX(float x){ this.x.clear(); this.x.add(new Length(x)); }
+      public void setY(float y){ this.y.clear(); this.y.add(new Length(y)); }
+      public void setX(float x, Unit unit){ this.x.clear(); this.x.add(new Length(x, unit)); }
+      public void setY(float y, Unit unit){ this.y.clear(); this.y.add(new Length(y, unit)); }
+      public void setX(float x, String unit) throws SAXException{ this.x.clear(); this.x.add(new Length(x, unit)); }
+      public void setY(float y, String unit) throws SAXException{ this.y.clear(); this.y.add(new Length(y, unit)); }
+      public void setX(String x) throws SAXException{ this.x.clear(); this.x.add(Length.parse(x)); }
+      public void setY(String y) throws SAXException{ this.y.clear(); this.y.add(Length.parse(y)); }
+      
+      public void addX(float x){ this.x.add(new Length(x)); }
+      public void addY(float y){ this.y.add(new Length(y)); }
+      public void addX(float x, Unit unit){ this.x.add(new Length(x, unit)); }
+      public void addY(float y, Unit unit){ this.y.add(new Length(y, unit)); }
+      public void addX(float x, String unit) throws SAXException{ this.x.add(new Length(x, unit)); }
+      public void addY(float y, String unit) throws SAXException{ this.y.add(new Length(y, unit)); }
+      public void addX(String x) throws SAXException{ this.x.add(Length.parse(x)); }
+      public void addY(String y) throws SAXException{ this.y.add(Length.parse(y)); }
+      
+      public void setDX(float dx){ this.dx.clear(); this.dx.add(new Length(dx)); }
+      public void setDY(float dy){ this.dy.clear(); this.dy.add(new Length(dy)); }
+      public void setDX(float dx, Unit unit){ this.dx.clear(); this.dx.add(new Length(dx, unit)); }
+      public void setDY(float dy, Unit unit){ this.dy.clear(); this.dy.add(new Length(dy, unit)); }
+      public void setDX(float dx, String unit) throws SAXException{ this.dx.clear(); this.dx.add(new Length(dx, unit)); }
+      public void setDY(float dy, String unit) throws SAXException{ this.dy.clear(); this.dy.add(new Length(dy, unit)); }
+      public void setDX(String dx) throws SAXException{ this.dx.clear(); this.dx.add(Length.parse(dx)); }
+      public void setDY(String dy) throws SAXException{ this.dy.clear(); this.dy.add(Length.parse(dy)); }
+      
+      public void addDX(float dx){ this.dx.add(new Length(dx)); }
+      public void addDY(float dy){ this.dy.add(new Length(dy)); }
+      public void addDX(float dx, Unit unit){ this.dx.add(new Length(dx, unit)); }
+      public void addDY(float dy, Unit unit){ this.dy.add(new Length(dy, unit)); }
+      public void addDX(float dx, String unit) throws SAXException{ this.dx.add(new Length(dx, unit)); }
+      public void addDY(float dy, String unit) throws SAXException{ this.dy.add(new Length(dy, unit)); }
+      public void addDX(String dx) throws SAXException{ this.dx.add(Length.parse(dx)); }
+      public void addDY(String dy) throws SAXException{ this.dy.add(Length.parse(dy)); }
+      
+      public void setPosition(float x, float y){ setX(x); setY(y); }
+      public void setPosition(float x, float y, Unit unit){ setX(x, unit); setY(y, unit); }
+      public void setPosition(float x, float y, String unit) throws SAXException{ setX(x, unit); setY(y, unit); }
+      public void setPosition(String x, String y) throws SAXException{ setX(x); setY(y); }
+
+      public void setTranslate(float dx, float dy){ setDX(dx); setDY(dy); }
+      public void setTranslate(float dx, float dy, Unit unit){ setDX(dx, unit); setDY(dy, unit); }
+      public void setTranslate(float dx, float dy, String unit) throws SAXException{ setDX(dx, unit); setDY(dy, unit); }
+      public void setTranslate(String dx, String dy) throws SAXException{ setDX(dx); setDY(dy); }
+
+      public Length getFirstX() { return this.x == null || this.x.size() == 0 ? null : this.x.get(0); }
+      public Length getFirstY() { return this.y == null || this.y.size() == 0 ? null : this.y.get(0); }
+      public Length getFirstDX() { return this.dx == null || this.dx.size() == 0 ? null : this.dx.get(0); }
+      public Length getFirstDY() { return this.dy == null || this.dy.size() == 0 ? null : this.dy.get(0); }
+
+
    }
 
 
-   protected static class Text extends TextPositionedContainer implements TextRoot, HasTransform
+   public static class Text extends TextPositionedContainer implements TextRoot, HasTransform
    {
       public Matrix  transform;
 
@@ -1684,7 +2011,7 @@ public class SVG
    }
 
 
-   protected static class TSpan extends TextPositionedContainer implements TextChild
+   public static class TSpan extends TextPositionedContainer implements TextChild
    {
       private TextRoot  textRoot;
 
@@ -1695,7 +2022,7 @@ public class SVG
    }
 
 
-   protected static class TextSequence extends SvgObject implements TextChild
+   public static class TextSequence extends SvgObject implements TextChild
    {
       public String  text;
 
@@ -1718,7 +2045,7 @@ public class SVG
    }
 
 
-   protected static class TRef extends TextContainer implements TextChild
+   public static class TRef extends TextContainer implements TextChild
    {
       public String  href;
 
@@ -1731,7 +2058,7 @@ public class SVG
    }
 
 
-   protected static class TextPath extends TextContainer implements TextChild
+   public static class TextPath extends TextContainer implements TextChild
    {
       public String  href;
       public Length  startOffset;
@@ -1746,17 +2073,17 @@ public class SVG
 
 
    // An SVG element that can contain other elements.
-   protected static class Switch extends Group
+   public static class Switch extends Group
    {
    }
 
 
-   protected static class Symbol extends SvgViewBoxContainer implements NotDirectlyRendered
+   public static class Symbol extends SvgViewBoxContainer implements NotDirectlyRendered
    {
    }
 
 
-   protected static class Marker extends SvgViewBoxContainer implements NotDirectlyRendered
+   public static class Marker extends SvgViewBoxContainer implements NotDirectlyRendered
    {
       public boolean  markerUnitsAreUser;
       public Length   refX;
@@ -1790,10 +2117,39 @@ public class SVG
          else
             throw new SAXException("Gradient elements cannot contain "+elem+" elements.");
       }
+      
+      @Override
+      public void addChild(int index, SvgObject elem) throws SAXException
+      {
+          if (elem instanceof Stop)
+              children.add(index, elem);
+           else
+              throw new SAXException("Gradient elements cannot contain "+elem+" elements.");
+      }
+      
+      @Override
+      public SvgObject getElementById(String id) throws SAXException
+      {
+    	  SvgObject elem = document.getElementById(id);
+    	  return (elem.parent != null && elem.parent.equals(this.parent)) ? elem : null;
+      }
+      
+      @Override
+      public List<SvgObject> getElementsByTagName(Class<SvgObject> clazz) throws SAXException
+      {
+    	  List<SvgObject> elemList = document.getElementsByTagName(clazz);
+    	  List<SvgObject> list = new ArrayList<SvgObject>();
+    	  for(SvgObject o : elemList)
+    	  {
+    		  if (o.parent != null && o.parent.equals(this.parent)) list.add(o);
+    	  }
+    	  return list;
+      }
+
    }
 
 
-   protected static class Stop extends SvgElementBase implements SvgContainer
+   public static class Stop extends SvgElementBase implements SvgContainer
    {
       public Float  offset;
 
@@ -1803,10 +2159,16 @@ public class SVG
       public List<SvgObject> getChildren() { return Collections.emptyList(); }
       @Override
       public void addChild(SvgObject elem) throws SAXException { /* do nothing */ }
+      @Override
+      public void addChild(int index, SvgObject elem) throws SAXException { /* do nothing */ }
+      @Override
+      public SvgObject getElementById(String id) throws SAXException { return null; }
+      @Override
+      public List<SvgObject> getElementsByTagName(Class<SvgObject> clazz) throws SAXException { return Collections.emptyList(); }
    }
 
 
-   protected static class SvgLinearGradient extends GradientElement
+   public static class SvgLinearGradient extends GradientElement
    {
       public Length  x1;
       public Length  y1;
@@ -1815,7 +2177,7 @@ public class SVG
    }
 
 
-   protected static class SvgRadialGradient extends GradientElement
+   public static class SvgRadialGradient extends GradientElement
    {
       public Length  cx;
       public Length  cy;
@@ -1825,13 +2187,13 @@ public class SVG
    }
 
 
-   protected static class ClipPath extends Group implements NotDirectlyRendered
+   public static class ClipPath extends Group implements NotDirectlyRendered
    {
       public Boolean  clipPathUnitsAreUser;
    }
 
 
-   protected static class Pattern extends SvgViewBoxContainer implements NotDirectlyRendered
+   public static class Pattern extends SvgViewBoxContainer implements NotDirectlyRendered
    {
       public Boolean  patternUnitsAreUser;
       public Boolean  patternContentUnitsAreUser;
@@ -1844,7 +2206,7 @@ public class SVG
    }
 
 
-   protected static class Image extends SvgPreserveAspectRatioContainer implements HasTransform
+   public static class Image extends SvgPreserveAspectRatioContainer implements HasTransform
    {
       public String  href;
       public Length  x;
@@ -1852,18 +2214,20 @@ public class SVG
       public Length  width;
       public Length  height;
       public Matrix  transform;
+      protected File cacheFile;
+      protected Bitmap cacheBitmap;
 
       @Override
       public void setTransform(Matrix transform) { this.transform = transform; }
    }
 
 
-   protected static class View extends SvgViewBoxContainer implements NotDirectlyRendered
+   public static class View extends SvgViewBoxContainer implements NotDirectlyRendered
    {
    }
 
 
-   protected static class Mask extends SvgConditionalContainer implements NotDirectlyRendered
+   public static class Mask extends SvgConditionalContainer implements NotDirectlyRendered
    {
       public Boolean  maskUnitsAreUser;
       public Boolean  maskContentUnitsAreUser;
@@ -1874,7 +2238,7 @@ public class SVG
    }
 
 
-   protected static class SolidColor extends SvgElementBase implements SvgContainer
+   public static class SolidColor extends SvgElementBase implements SvgContainer
    {
       public Length  solidColor;
       public Length  solidOpacity;
@@ -1885,6 +2249,12 @@ public class SVG
       public List<SvgObject> getChildren() { return Collections.emptyList(); }
       @Override
       public void addChild(SvgObject elem) throws SAXException { /* do nothing */ }
+      @Override
+      public void addChild(int index, SvgObject elem) throws SAXException { /* do nothing */ }
+      @Override
+      public SvgObject getElementById(String id) throws SAXException { return null; }
+      @Override
+      public List<SvgObject> getElementsByTagName(Class<SvgObject> clazz) throws SAXException { return Collections.emptyList(); }
    }
 
 

@@ -1,5 +1,6 @@
 /*
    Copyright 2013 Paul LeBeau, Cave Rock Software Ltd.
+   Copyright 2015 François RAOULT, Personal work.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -164,6 +165,12 @@ public class PreserveAspectRatio
    }
 
 
+   @Override
+	public String toString()
+	{
+		return "("+this.alignment.name()+","+this.scale.name()+")";
+	}
+   
    /**
     * Returns the alignment value of this instance.
     * @return the alignment

@@ -1,5 +1,6 @@
 /*
    Copyright 2013 Paul LeBeau, Cave Rock Software Ltd.
+   Copyright 2015 François RAOULT, Personal work.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -91,7 +92,7 @@ public class CSSParser
       }
    }
 
-   private static class SimpleSelector
+   protected static class SimpleSelector
    {
       public Combinator    combinator = null;
       public String        tag = null;       // null means "*"

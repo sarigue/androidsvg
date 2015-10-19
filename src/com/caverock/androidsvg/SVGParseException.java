@@ -20,6 +20,7 @@ package com.caverock.androidsvg;
  * Thrown by the parser if a problem is found in the SVG file.
  */
 
+@SuppressWarnings("serial")
 public class SVGParseException extends Exception
 {
    public SVGParseException(String msg)

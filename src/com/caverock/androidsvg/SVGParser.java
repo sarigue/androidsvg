@@ -1,5 +1,6 @@
 /*
    Copyright 2013 Paul LeBeau, Cave Rock Software Ltd.
+   Copyright 2015 François RAOULT, Personal work.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -2582,7 +2583,7 @@ public class SVGParser extends DefaultHandler2
    /*
     * Parse the 'style' attribute.
     */
-   private static void  parseStyle(SvgElementBase obj, String style) throws SAXException
+   protected static void  parseStyle(SvgElementBase obj, String style) throws SAXException
    {
       TextScanner  scan = new TextScanner(style.replaceAll("/\\*.*?\\*/", ""));  // regex strips block comments
 
