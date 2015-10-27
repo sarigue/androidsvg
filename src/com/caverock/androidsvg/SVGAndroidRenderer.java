@@ -224,6 +224,21 @@ public class SVGAndroidRenderer
    {
       return dpi;
    }
+   
+   protected void setCanvas(Canvas canvas)
+   {
+	   this.canvas = canvas;
+   }
+   
+   protected void setDPI(float dpi)
+   {
+	   this.dpi = dpi;
+   }
+   
+   protected void setViewPort(SVG.Box viewPort)
+   {
+	   this.canvasViewPort = viewPort;
+   }
 
 
    protected float  getCurrentFontSize()
@@ -1278,7 +1293,7 @@ public class SVGAndroidRenderer
       if (obj.transform != null)
          canvas.concat(obj.transform);
 
-      int  numPoints = obj.points.length;
+      int  numPoints = obj.points == null ? 0 : obj.points.length;
       if (numPoints < 2)
          return;
 
@@ -1362,7 +1377,7 @@ public class SVGAndroidRenderer
       if (obj.transform != null)
          canvas.concat(obj.transform);
 
-      int  numPoints = obj.points.length;
+      int  numPoints = obj.points == null ? 0 : obj.points.length;
       if (numPoints < 2)
          return;
 
@@ -1496,7 +1511,7 @@ public class SVGAndroidRenderer
     * Given a text container, recursively visit its children invoking the TextDrawer
     * handler for each segment of text found.
     */
-   private void enumerateTextSpans(TextContainer obj, TextProcessor textprocessor)
+   protected void enumerateTextSpans(TextContainer obj, TextProcessor textprocessor)
    {
       if (!display())
          return;
@@ -1722,7 +1737,7 @@ public class SVGAndroidRenderer
    /*
     * Use the TextDrawer process to determine the bounds of a <text> element
     */
-   private class  TextBoundsCalculator extends TextProcessor
+   protected class  TextBoundsCalculator extends TextProcessor
    {
       float  x;
       float  y;
@@ -2508,7 +2523,7 @@ public class SVGAndroidRenderer
    /*
     *  Convert an internal PathDefinition to an android.graphics.Path object
     */
-   private class  PathConverter implements PathInterface
+   protected static class  PathConverter implements PathInterface
    {
       Path   path = new Path();
       float  lastX, lastY;

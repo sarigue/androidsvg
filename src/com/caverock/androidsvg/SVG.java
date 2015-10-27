@@ -23,11 +23,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -40,12 +42,19 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.Paint.Cap;
+import android.graphics.Paint.Join;
 import android.graphics.Picture;
 import android.graphics.RectF;
 import android.graphics.Bitmap.Config;
 import android.util.Log;
 
 import com.caverock.androidsvg.CSSParser.Ruleset;
+import com.caverock.androidsvg.SVG.Style.FontStyle;
+import com.caverock.androidsvg.SVG.Style.TextDecoration;
+import com.caverock.androidsvg.SVG.Style.TextDirection;
+import com.caverock.androidsvg.SVGAndroidRenderer.PathConverter;
+import com.caverock.androidsvg.SVGAndroidRenderer.TextBoundsCalculator;
 
 /**
  * AndroidSVG is a library for reading, parsing and rendering SVG documents on Android devices.
@@ -1260,7 +1269,7 @@ public class SVG
 
 
       @Override
-      protected Object  clone()
+      public Object  clone()
       {
          Style obj;
          try
@@ -1515,6 +1524,113 @@ public class SVG
          }
       }
 
+      // Convert length to user units for a horizontally-related context.
+      public void setValueX(SVGAndroidRenderer renderer, float pxValue)
+      {
+    	 if (renderer == null && Unit.px.equals(unit) && ! Unit.percent.equals(unit))
+    	 {
+    		 Log.e(TAG, "Renderer is null !");
+    		 return;
+    	 }
+    	 
+         switch (unit)
+         {
+            case px:
+               value = pxValue;
+            case em:
+               value = pxValue / renderer.getCurrentFontSize();
+            case ex:
+               value = pxValue / renderer.getCurrentFontXHeight();
+            case in:
+               value = pxValue / renderer.getDPI();
+            case cm:
+               value = pxValue / renderer.getDPI() * 2.54f;
+            case mm:
+               value = pxValue / renderer.getDPI() * 25.4f;
+            case pt: // 1 point = 1/72 in
+               value = pxValue / renderer.getDPI() * 72f;
+            case pc: // 1 pica = 1/6 in
+               value = pxValue / renderer.getDPI() * 6f;
+            case percent:
+               Box  viewPortUser = renderer.getCurrentViewPortInUserUnits();
+               if (viewPortUser == null)
+                  value = pxValue;  // Undefined in this situation - so just return value to avoid an NPE
+               value = pxValue / viewPortUser.width * 100f;
+            default:
+               value = pxValue;
+         }
+      }
+
+      // Convert length to user units for a vertically-related context.
+      public void setValueY(SVGAndroidRenderer renderer, float pxValue)
+      {
+         if (unit == Unit.percent) {
+            Box  viewPortUser = renderer.getCurrentViewPortInUserUnits();
+            if (viewPortUser == null)
+               value = pxValue;  // Undefined in this situation - so just return value to avoid an NPE
+            value = pxValue / viewPortUser.height * 100f;
+         }
+         setValueX(renderer, pxValue);
+      }
+
+      // Convert length to user units for a context that is not orientation specific.
+      // For example, stroke width.
+      public void setValue(SVGAndroidRenderer renderer, float pxValue)
+      {
+         if (unit == Unit.percent)
+         {
+            Box  viewPortUser = renderer.getCurrentViewPortInUserUnits();
+            if (viewPortUser == null)
+               value = pxValue;  // Undefined in this situation - so just return value to avoid an NPE
+            float w = viewPortUser.width;
+            float h = viewPortUser.height;
+            if (w == h)
+               value = pxValue / w * 100f;
+            float n = (float) (Math.sqrt(w*w+h*h) / SQRT2);  // see spec section 7.10
+            value = pxValue / n * 100f;
+         }
+         setValueX(renderer, pxValue);
+      }
+
+      // Convert length to user units for a context that is not orientation specific.
+      // For percentage values, use the given 'max' parameter to represent the 100% value.
+      public void setValue(SVGAndroidRenderer renderer, float max, float pxValue)
+      {
+         if (unit == Unit.percent)
+         {
+        	 value = pxValue / max * 100f;
+        	 return;
+         }
+         setValueX(renderer, pxValue);
+      }
+
+      // For situations (like calculating the initial viewport) when we can only rely on
+      // physical real world units.
+      public void setValue(float dpi, float pxValue)
+      {
+         switch (unit)
+         {
+            case px:
+               value = pxValue;
+            case in:
+               value = pxValue / dpi;
+            case cm:
+            	value = pxValue / dpi * 2.54f;
+            case mm:
+            	value = pxValue / dpi * 25.4f;
+            case pt: // 1 point = 1/72 in
+            	value = pxValue / dpi * 72f;
+            case pc: // 1 pica = 1/6 in
+            	value = pxValue / dpi * 6f;
+            case em:
+            case ex:
+            case percent:
+            default:
+            	value = pxValue;
+         }
+      }
+
+      
       public boolean isZero()
       {
          return value == 0f;
@@ -1529,6 +1645,72 @@ public class SVG
       public String toString()
       {
          return String.valueOf(value) + unit;
+      }
+      
+      public static float convertFromPx(SVGAndroidRenderer renderer, float pxValue, Unit unit)
+      {
+    	 if (renderer == null && Unit.px.equals(unit) && ! Unit.percent.equals(unit))
+    	 {
+    		 Log.e(TAG, "Renderer is null !");
+    		 return pxValue;
+    	 }
+    	 
+    	 float value = pxValue;
+    	 
+         switch (unit)
+         {
+            case px:
+               value = pxValue;
+            case em:
+               value = pxValue / renderer.getCurrentFontSize();
+            case ex:
+               value = pxValue / renderer.getCurrentFontXHeight();
+            case in:
+               value = pxValue / renderer.getDPI();
+            case cm:
+               value = pxValue / renderer.getDPI() * 2.54f;
+            case mm:
+               value = pxValue / renderer.getDPI() * 25.4f;
+            case pt: // 1 point = 1/72 in
+               value = pxValue / renderer.getDPI() * 72f;
+            case pc: // 1 pica = 1/6 in
+               value = pxValue / renderer.getDPI() * 6f;
+            case percent:
+               Box  viewPortUser = renderer.getCurrentViewPortInUserUnits();
+               if (viewPortUser == null)
+                  value = pxValue;  // Undefined in this situation - so just return value to avoid an NPE
+               value = pxValue / viewPortUser.width * 100f;
+            default:
+               value = pxValue;
+         }
+         
+         return value;
+      }
+      
+      public static float convertFromPx(float dpi, float pxValue, Unit unit)
+      {
+    	 float value = pxValue;
+         switch (unit)
+         {
+            case px:
+               value = pxValue;
+            case in:
+               value = pxValue / dpi;
+            case cm:
+            	value = pxValue / dpi * 2.54f;
+            case mm:
+            	value = pxValue / dpi * 25.4f;
+            case pt: // 1 point = 1/72 in
+            	value = pxValue / dpi * 72f;
+            case pc: // 1 pica = 1/6 in
+            	value = pxValue / dpi * 6f;
+            case em:
+            case ex:
+            case percent:
+            default:
+            	value = pxValue;
+         }
+         return value;
       }
    }
 
@@ -1571,14 +1753,13 @@ public class SVG
       {
     	  SvgContainer parent = sibling.parent;
     	  if (parent != null){
+			  remove();
     		  int index = parent.getChildren().indexOf(sibling);
     		  if (index >= 0){
-    			  remove();
     			  this.parent = parent;
     			  parent.addChild(index+1, this);
     		  }
     		  else{
-    			  remove();
     			  this.parent = parent;
     			  parent.addChild(this);
     		  }
@@ -1621,14 +1802,13 @@ public class SVG
       {
     	  SvgContainer parent = sibling.parent;
     	  if (parent != null){
+			  remove();
     		  int index = parent.getChildren().indexOf(sibling);
     		  if (index >= 0){
-    			  remove();
     			  this.parent = parent;
     			  parent.addChild(index, this);
     		  }
     		  else{
-    			  remove();
     			  this.parent = parent;
     			  parent.addChild(this);
     		  }
@@ -1646,11 +1826,27 @@ public class SVG
     	  return this;
       }
 
+      public void appendToDocument(SVG svg)
+      {
+    	  if (svg != null && ! svg.equals(this))
+    	  {
+    		  try{svg.rootElement.addChild(this);}catch(SAXException e){e.printStackTrace();}
+    	  }
+      }
+      
+      public void appendToParent(SvgContainer parent)
+      {
+    	  if (parent != null)
+    	  {
+    		  try{parent.addChild(this);}catch(SAXException e){e.printStackTrace();}
+    	  }
+      }
+      
    }
 
 
    // Any object in the tree that corresponds to an SVG element
-   protected static class SvgElementBase extends SvgObject
+   public static class SvgElementBase extends SvgObject implements Cloneable
    {
       public String        id = null;
       public Boolean       spacePreserve = null;
@@ -1674,6 +1870,22 @@ public class SVG
       {
     	  this.style = null;
     	  this.baseStyle = null;
+      }
+      
+      @Override
+      public SvgElementBase clone() throws CloneNotSupportedException
+      {
+    	SvgElementBase object;
+		try
+		{
+			object = (SvgElementBase)this.getClass().getConstructor().newInstance();
+	  		object.style = (SVG.Style)this.style.clone();
+	  		return object;
+		}
+		catch (Exception e)
+		{
+			throw new CloneNotSupportedException(e.getMessage());
+		}
       }
       
    }
@@ -1757,9 +1969,9 @@ public class SVG
       @Override
       public List<SvgObject>  getChildren() { return children; }
       @Override
-      public void addChild(SvgObject elem) throws SAXException  { children.add(elem); }
+      public void addChild(SvgObject elem) throws SAXException  { elem.parent = this; children.add(elem); }
       @Override
-      public void addChild(int index, SvgObject elem) throws SAXException { children.add(index, elem); }
+      public void addChild(int index, SvgObject elem) throws SAXException { elem.parent = this; children.add(index, elem); }
       @Override
       public SvgObject getElementById(String id) throws SAXException { SvgObject elem = document.getElementById(id); return (elem.parent != null && elem.parent.equals(this.parent)) ? elem : null;  }
       @Override
@@ -1793,6 +2005,27 @@ public class SVG
       public void setTransform(Matrix matrix);
    }
 
+   protected interface IsColoriable
+   {
+	     public void setStrokeNone();
+	     public void setStrokeColor(Integer color);
+	     public void setStrokeColor(SVG.SolidColor color);
+	     public void setStrokeRef(SVG.PaintReference ref);
+	     public void setStrokeWidth(int width);
+	     public void setStrokeOpacity(int opacity);
+	     public void setStrokeLine(Cap cap, Join join);
+	     public void setStrokeDashArray(int dash, int space);
+	     public void setStrokeDashArray(int[] dashArray);
+	     public void setFillNone();
+	     public void setFillColor(Integer color);
+	     public void setFillColor(SVG.SolidColor color);
+	     public void setFillRef(SVG.PaintReference ref);
+	     public void setFillGradient(SVG.GradientElement gradient);
+	     public void setFillOpacity(Integer opacity);
+	     public void undefineFill();
+	     public void undefineStroke();
+   }
+   
 
    protected static class SvgPreserveAspectRatioContainer extends SvgConditionalContainer
    {
@@ -1813,6 +2046,52 @@ public class SVG
       public Length  width;
       public Length  height;
       public String  version;
+      
+      public SvgElementBase getTopElement(float x, float y, SVGAndroidRenderer renderer)
+      {
+		  RectF bounds = new RectF();
+    	  for(int i=children.size()-1; i>=0; i--)
+    	  {
+    		  SvgObject child = children.get(i);
+    		  if (child instanceof GraphicsElement)
+    		  {
+    			  GraphicsElement e = (GraphicsElement)child;
+    			  e.getBounds(bounds, renderer);
+    			  if (bounds.contains(x, y))
+    			  {
+    				  return e;
+    			  }
+    		  }
+    		  else if (child instanceof TextPositionedContainer)
+    		  {
+    			  TextPositionedContainer e = (TextPositionedContainer)child;
+    			  e.getBounds(bounds, renderer);
+    			  if (bounds.contains(x, y))
+    			  {
+    				  return e;
+    			  }
+    		  }
+    		  else if (child instanceof Group)
+    		  {
+    			  Group e = (Group)child;
+    			  e.getBounds(bounds, renderer);
+    			  if (bounds.contains(x, y))
+    			  {
+    				  return e;
+    			  }
+    		  }
+    		  else if (child instanceof Image)
+    		  {
+    			  Image e = (Image)child;
+    			  e.getBounds(bounds, renderer);
+    			  if (bounds.contains(x, y))
+    			  {
+    				  return e;
+    			  }
+    		  }
+    	  }
+    	  return null;
+      }
    }
 
 
@@ -1823,6 +2102,59 @@ public class SVG
 
       @Override
       public void setTransform(Matrix transform) { this.transform = transform; }
+      
+      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
+      {
+    	  rect.left = 0;
+    	  rect.right = 0;
+    	  rect.top = 0;
+    	  rect.bottom = 0;
+    	  RectF childBounds = new RectF();
+    	  for(SvgObject child : children)
+    	  {
+    		  if (child instanceof Image)
+    		  {
+    			  ((Image)child).getBounds(childBounds, renderer);
+    			  if (rect.width() == 0)
+    			  {
+    				  rect.left = childBounds.left;
+    				  rect.right = childBounds.right;
+    				  rect.top = childBounds.top;
+    				  rect.bottom = childBounds.bottom;
+    			  }
+    			  rect.union(childBounds);
+    		  }
+    		  else if (child instanceof GraphicsElement)
+    		  {
+    			  ((GraphicsElement)child).getBounds(childBounds, renderer);
+    			  if (rect.width() == 0)
+    			  {
+    				  rect.left = childBounds.left;
+    				  rect.right = childBounds.right;
+    				  rect.top = childBounds.top;
+    				  rect.bottom = childBounds.bottom;
+    			  }
+    			  rect.union(childBounds);
+    		  }
+    		  else if (child instanceof TextPositionedContainer)
+    		  {
+    			  ((TextPositionedContainer)child).getBounds(childBounds, renderer);
+    			  if (rect.width() == 0)
+    			  {
+    				  rect.left = childBounds.left;
+    				  rect.right = childBounds.right;
+    				  rect.top = childBounds.top;
+    				  rect.bottom = childBounds.bottom;
+    			  }
+    			  rect.union(childBounds);
+    		  }
+    	  }
+    	  if (transform != null)
+    	  {
+    		  transform.mapRect(rect);
+    	  }
+      }
+
    }
 
 
@@ -1840,12 +2172,222 @@ public class SVG
 
    // One of the element types that can cause graphics to be drawn onto the target canvas.
    // Specifically: �circle�, �ellipse�, �image�, �line�, �path�, �polygon�, �polyline�, �rect�, �text� and �use�.
-   protected static abstract class GraphicsElement extends SvgConditionalElement implements HasTransform
+   public static abstract class GraphicsElement extends SvgConditionalElement implements HasTransform, IsColoriable
    {
       public Matrix  transform;
 
       @Override
       public void setTransform(Matrix transform) { this.transform = transform; }
+
+      public RectF getBounds(SVGAndroidRenderer renderer)
+      {
+    	  RectF rect = new RectF();
+    	  getBounds(rect, renderer);
+    	  return rect;
+      }
+      
+      public abstract void getBounds(RectF rect, SVGAndroidRenderer renderer);
+      
+      public void setStrokeNone()
+      {
+    	setPaint("stroke", "none");
+      }
+      
+      @Override
+      public void setStrokeColor(Integer color)
+      {
+      	setPaint("stroke", color);
+      }
+      
+      @Override
+      public void setStrokeColor(SVG.SolidColor color)
+      {
+    	setPaint("fill", color);
+      }
+
+      @Override
+      public void setStrokeRef(SVG.PaintReference ref)
+      {
+    	setPaint("fill", ref);
+      }
+
+      
+      @Override
+      public void setStrokeWidth(int width)
+      {
+    	  if (width > 0)
+    	  {
+        	  setPaint("stroke-width", String.valueOf(width));
+    	  }
+    	  else
+    	  {
+    		  this.style.specifiedFlags &= ~ SPECIFIED_STROKE_WIDTH;
+    	  }
+      }
+      
+      @Override
+      public void setStrokeOpacity(int opacity)
+      {
+    	  if (opacity >= 0)
+    	  {
+        	  setPaint("stroke-opacity", opacity);
+    	  }
+    	  else
+    	  {
+    		  this.style.specifiedFlags &= ~ SPECIFIED_STROKE_OPACITY;
+    	  }
+      }
+
+      @Override
+      public void setStrokeLine(Cap cap, Join join)
+      {
+    	  	  if (cap == null) this.style.specifiedFlags &= SPECIFIED_STROKE_LINECAP;
+    		  if (Cap.BUTT.equals(cap)) setPaint("stroke-linecap", "butt");
+    		  if (Cap.ROUND.equals(cap)) setPaint("stroke-linecap", "round");
+    		  if (Cap.SQUARE.equals(cap)) setPaint("stroke-linecap", "square");
+    		  
+    	  	  if (join == null) this.style.specifiedFlags &= SPECIFIED_STROKE_LINEJOIN;
+    		  if (Join.BEVEL.equals(cap)) setPaint("stroke-linecap", "bevel");
+    		  if (Join.MITER.equals(cap)) setPaint("stroke-linecap", "miter");
+    		  if (Join.ROUND.equals(cap)) setPaint("stroke-linecap", "round");
+      }
+      
+      @Override
+      public void setStrokeDashArray(int dash, int space)
+      {
+    	  setPaint("stroke-dasharray", dash+","+space);
+      }
+
+      @Override
+      public void setStrokeDashArray(int[] dashArray)
+      {
+    	  if (dashArray == null)
+    	  {
+    		  this.style.specifiedFlags &= SPECIFIED_STROKE_DASHARRAY;
+    		  return;
+    	  }
+    	  StringBuilder dash_array_string = new StringBuilder();
+    	  boolean first = true;
+    	  for(int v : dashArray)
+    	  {
+    		  if (! first) dash_array_string.append(",");
+    		  dash_array_string.append(String.valueOf(v));
+    		  first = false;
+    	  }
+    	  setPaint("stroke-dasharray", dash_array_string.toString());
+      }
+
+      
+      public void setFillNone()
+      {
+    	setPaint("fill", "none");  
+      }
+      
+      @Override
+      public void setFillColor(Integer color)
+      {
+    	setPaint("fill", color);
+      }
+
+      @Override
+      public void setFillColor(SVG.SolidColor color)
+      {
+    	setPaint("fill", color);
+      }
+
+      @Override
+      public void setFillRef(SVG.PaintReference ref)
+      {
+    	setPaint("fill", ref);
+      }
+
+      @Override
+      public void setFillGradient(SVG.GradientElement gradient)
+      {
+    	  setPaint("fill", gradient);
+      }
+      
+      @Override
+      public void setFillOpacity(Integer opacity)
+      {
+    	  if (opacity == null)
+    	  {
+        	  this.style.specifiedFlags &= ~SPECIFIED_FILL_OPACITY;
+    	  }
+    	  setPaint("fill-opacity", String.valueOf(opacity));
+      }
+      
+      @Override
+      public void undefineFill()
+      {
+    	  this.style.specifiedFlags &= ~ SPECIFIED_FILL & ~SPECIFIED_FILL_OPACITY & ~SPECIFIED_FILL_RULE;
+      }
+
+      @Override
+      public void undefineStroke()
+      {
+    	  this.style.specifiedFlags &= ~ SPECIFIED_STROKE & ~SPECIFIED_STROKE_DASHARRAY & ~SPECIFIED_STROKE_DASHOFFSET;
+    	  this.style.specifiedFlags &= ~ SPECIFIED_STROKE_LINECAP & ~SPECIFIED_STROKE_LINEJOIN & ~SPECIFIED_STROKE_MITERLIMIT;
+    	  this.style.specifiedFlags &= ~ SPECIFIED_STROKE_OPACITY & ~SPECIFIED_STROKE_WIDTH;
+      }
+
+
+      private void setPaint(String style, Object value)
+      {
+          String value_string = "";
+          if (value==null)
+          {
+        	  value_string = "none";
+          }
+          else if (value instanceof Integer)
+          {
+        	  value_string = "#"+Integer.toHexString(((Integer) value).intValue() & 0xFFFFFF);
+          }
+          else if (value instanceof SVG.GradientElement)
+          {
+        	  value_string = ((SVG.GradientElement) value).id;
+        	  if (value_string == null || "".equals(value_string))
+        	  {
+        		  return;
+        	  }
+        	  value_string = "url(#"+value_string+")";
+          }
+          else if (value instanceof SVG.SolidColor)
+          {
+        	  value_string = ((SVG.SolidColor) value).id;
+        	  if (value_string == null || "".equals(value_string))
+        	  {
+        		  return;
+        	  }
+        	  value_string = "url(#"+value_string+")";
+          }
+          else if (value instanceof SVG.Pattern)
+          {
+        	  value_string = ((SVG.Pattern) value).id;
+        	  if (value_string == null || "".equals(value_string))
+        	  {
+        		  return;
+        	  }
+        	  value_string = "url(#"+value_string+")";
+          }
+          else if (value instanceof SVG.PaintReference)
+          {
+        	  value_string = "url("+((SVG.PaintReference)value).href+") "+((SVG.PaintReference)value).fallback;
+          }
+          else if (value instanceof String)
+          {
+        	  value_string = (String)value;
+          }
+          else
+          {
+        	  return;
+          }
+          try{
+    			setStyle(style, value_string);
+          }catch (SAXException e){
+    			e.printStackTrace();
+          }
+      }
    }
 
 
@@ -1863,6 +2405,18 @@ public class SVG
    {
       public PathDefinition  d;
       public Float           pathLength;
+      
+      @Override
+      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
+      {
+    	  PathConverter converter = new PathConverter(d);
+    	  android.graphics.Path p = converter.getPath();
+    	  p.computeBounds(rect, true);
+    	  if (transform != null)
+    	  {
+    		  transform.mapRect(rect);
+    	  }
+      }
    }
 
 
@@ -1874,6 +2428,19 @@ public class SVG
       public Length  height;
       public Length  rx;
       public Length  ry;
+      
+      @Override
+      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
+      {
+    	 rect.left = (x == null) ? 0 : x.floatValue(renderer);
+    	 rect.top  = (y == null) ? 0 : y.floatValue(renderer);
+    	 rect.right  = rect.left + (width == null ? 0 : width.floatValue(renderer));
+    	 rect.bottom = rect.top  + (height == null ? 0 : height.floatValue(renderer));
+       	  if (transform != null)
+       	  {
+       		  transform.mapRect(rect);
+       	  }
+      }
    }
 
 
@@ -1882,6 +2449,21 @@ public class SVG
       public Length  cx;
       public Length  cy;
       public Length  r;
+      
+      @Override
+      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
+      {
+    	 float r = (this.r == null) ? 0f : this.r.floatValue(renderer);
+    	 rect.left = cx == null ? 0 : cx.floatValue(renderer) - r;
+    	 rect.top  = cy == null ? 0 : cy.floatValue(renderer) - r;
+    	 rect.right  = rect.left + 2*r;
+    	 rect.bottom = rect.top  + 2*r;
+       	  if (transform != null)
+       	  {
+       		  transform.mapRect(rect);
+       	  }
+      }
+
    }
 
 
@@ -1891,6 +2473,21 @@ public class SVG
       public Length  cy;
       public Length  rx;
       public Length  ry;
+
+      @Override
+      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
+      {
+    	 float rx = this.rx == null ? 0 : this.rx.floatValue(renderer);
+    	 float ry = this.ry == null ? 0 : this.ry.floatValue(renderer);
+    	 rect.left = cx == null ? 0 : cx.floatValue(renderer) - rx;
+    	 rect.top  = cy == null ? 0 : cy.floatValue(renderer) - ry;
+    	 rect.right  = rect.left + 2*rx;
+    	 rect.bottom = rect.top  + 2*ry;
+       	  if (transform != null)
+       	  {
+       		  transform.mapRect(rect);
+       	  }
+      }
    }
 
 
@@ -1900,17 +2497,57 @@ public class SVG
       public Length  y1;
       public Length  x2;
       public Length  y2;
+      
+      @Override
+      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
+      {
+    	 rect.left = x1 == null ? 0 : x1.floatValue(renderer);
+    	 rect.top  = y1 == null ? 0 : y1.floatValue(renderer);
+    	 rect.right  = x2 == null ? 0 : x2.floatValue(renderer);
+    	 rect.bottom = y2 == null ? 0 : y2.floatValue(renderer);
+    	 rect.sort();
+       	  if (transform != null)
+       	  {
+       		  transform.mapRect(rect);
+       	  }
+      }
    }
 
 
    public static class PolyLine extends GraphicsElement
    {
       public float[]  points;
+
+      @Override
+      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
+      {
+    	  rect.left   = 0;
+    	  rect.top    = 0;
+    	  rect.right  = 0;
+    	  rect.bottom = 0;
+    	  if (points != null)
+    	  {
+        	  for(int i=0; i<points.length-1; i=i+2)
+        	  {
+        		 float x = points[i];
+        		 float y = points[i+1];
+        		 if (x < rect.left)   rect.left   = x;
+        		 if (x > rect.right)  rect.right  = x;
+        		 if (y < rect.top)    rect.top    = y;
+        		 if (y > rect.bottom) rect.bottom = y;
+        	  }
+    	  }
+    	  if (transform != null)
+    	  {
+    		  transform.mapRect(rect);
+    	  }
+      }
    }
 
 
    public static class Polygon extends PolyLine
    {
+	   
    }
 
 
@@ -1927,7 +2564,7 @@ public class SVG
    }
    
 
-   protected static class  TextContainer extends SvgConditionalContainer
+   protected static class  TextContainer extends SvgConditionalContainer implements IsColoriable
    {
       @Override
       public void  addChild(SvgObject elem) throws SAXException
@@ -1936,6 +2573,272 @@ public class SVG
             children.add(elem);
          else
             throw new SAXException("Text content elements cannot contain "+elem+" elements.");
+      }
+      
+      public void setFontSize(int size)
+      {
+    	  setPaint("font-size", size + "px");
+      }
+
+      public void setFontSize(int size, Unit unit)
+      {
+    	  setPaint("font-size", size + unit.toString());
+      }
+
+      public void setFontSize(String size)
+      {
+    	  setPaint("font-size", size);
+      }
+
+      public void setFontStyle(FontStyle style)
+      {
+    	  setPaint("font-style", style.toString().toLowerCase(Locale.US));
+      }
+
+      public void setTextDecoration(TextDecoration decoration)
+      {
+    	  setPaint("text-decoration", decoration.toString().toLowerCase(Locale.US));
+      }
+
+      public void setTextDirection(TextDirection direction)
+      {
+    	  setPaint("text-direction", direction.toString().toLowerCase(Locale.US));
+      }
+      
+      public void setFontWeight(String weight)
+      {
+    	  setPaint("font-weight", weight);
+      }
+
+      public void setFontWeight(int weight)
+      {
+    	  setPaint("font-weight", String.valueOf(weight));
+      }
+
+      @Override
+      public void setStrokeNone()
+      {
+        	setPaint("stroke", "none");
+      }
+      
+      @Override
+      public void setStrokeColor(Integer color)
+      {
+      	setPaint("stroke", color);
+      }
+      
+      @Override
+      public void setStrokeColor(SVG.SolidColor color)
+      {
+    	setPaint("fill", color);
+      }
+
+      @Override
+      public void setStrokeRef(SVG.PaintReference ref)
+      {
+    	setPaint("fill", ref);
+      }
+
+      
+      @Override
+      public void setStrokeWidth(int width)
+      {
+    	  if (width > 0)
+    	  {
+        	  setPaint("stroke-width", String.valueOf(width));
+    	  }
+    	  else
+    	  {
+    		  this.style.specifiedFlags &= ~ SPECIFIED_STROKE_WIDTH;
+    	  }
+      }
+      
+      @Override
+      public void setStrokeOpacity(int opacity)
+      {
+    	  if (opacity >= 0)
+    	  {
+        	  setPaint("stroke-opacity", opacity);
+    	  }
+    	  else
+    	  {
+    		  this.style.specifiedFlags &= ~ SPECIFIED_STROKE_OPACITY;
+    	  }
+      }
+
+      @Override
+      public void setStrokeLine(Cap cap, Join join)
+      {
+    	  	  if (cap == null) this.style.specifiedFlags &= SPECIFIED_STROKE_LINECAP;
+    		  if (Cap.BUTT.equals(cap)) setPaint("stroke-linecap", "butt");
+    		  if (Cap.ROUND.equals(cap)) setPaint("stroke-linecap", "round");
+    		  if (Cap.SQUARE.equals(cap)) setPaint("stroke-linecap", "square");
+    		  
+    	  	  if (join == null) this.style.specifiedFlags &= SPECIFIED_STROKE_LINEJOIN;
+    		  if (Join.BEVEL.equals(cap)) setPaint("stroke-linecap", "bevel");
+    		  if (Join.MITER.equals(cap)) setPaint("stroke-linecap", "miter");
+    		  if (Join.ROUND.equals(cap)) setPaint("stroke-linecap", "round");
+      }
+      
+      @Override
+      public void setStrokeDashArray(int dash, int space)
+      {
+    	  setPaint("stroke-dasharray", dash+","+space);
+      }
+
+      @Override
+      public void setStrokeDashArray(int[] dashArray)
+      {
+    	  if (dashArray == null)
+    	  {
+    		  this.style.specifiedFlags &= SPECIFIED_STROKE_DASHARRAY;
+    		  return;
+    	  }
+    	  StringBuilder dash_array_string = new StringBuilder();
+    	  boolean first = true;
+    	  for(int v : dashArray)
+    	  {
+    		  if (! first) dash_array_string.append(",");
+    		  dash_array_string.append(String.valueOf(v));
+    		  first = false;
+    	  }
+    	  setPaint("stroke-dasharray", dash_array_string.toString());
+      }
+
+      @Override
+      public void setFillNone()
+      {
+        	setPaint("fill", "none");
+      }
+
+      @Override
+      public void setFillColor(Integer color)
+      {
+    	setPaint("fill", color);
+      }
+
+      @Override
+      public void setFillColor(SVG.SolidColor color)
+      {
+    	setPaint("fill", color);
+      }
+
+      @Override
+      public void setFillRef(SVG.PaintReference ref)
+      {
+    	setPaint("fill", ref);
+      }
+
+      @Override
+      public void setFillGradient(SVG.GradientElement gradient)
+      {
+    	  setPaint("fill", gradient);
+      }
+      
+      @Override
+      public void setFillOpacity(Integer opacity)
+      {
+    	  if (opacity == null)
+    	  {
+        	  this.style.specifiedFlags &= ~SPECIFIED_FILL_OPACITY;
+    	  }
+    	  setPaint("fill-opacity", String.valueOf(opacity));
+      }
+      
+      @Override
+      public void undefineFill()
+      {
+    	  this.style.specifiedFlags &= ~ SPECIFIED_FILL & ~SPECIFIED_FILL_OPACITY & ~SPECIFIED_FILL_RULE;
+      }
+
+      @Override
+      public void undefineStroke()
+      {
+    	  this.style.specifiedFlags &= ~ SPECIFIED_STROKE & ~SPECIFIED_STROKE_DASHARRAY & ~SPECIFIED_STROKE_DASHOFFSET;
+    	  this.style.specifiedFlags &= ~ SPECIFIED_STROKE_LINECAP & ~SPECIFIED_STROKE_LINEJOIN & ~SPECIFIED_STROKE_MITERLIMIT;
+    	  this.style.specifiedFlags &= ~ SPECIFIED_STROKE_OPACITY & ~SPECIFIED_STROKE_WIDTH;
+      }
+
+      public String getString()
+      {
+    	  StringBuilder builder = new StringBuilder();
+    	  for(SvgObject child : children)
+    	  {
+    		  if (child instanceof TSpan)
+    		  {
+    			  builder.append(((TSpan)child).getString());
+    		  }
+    		  else if (child instanceof Text)
+    		  {
+    			  builder.append(((Text)child).getString());
+    		  }
+    		  else if (child instanceof TextSequence)
+    		  {
+    			  builder.append(((TextSequence)child).text);
+    		  }
+    		  else if (child instanceof TRef)
+    		  {
+    			  builder.append(((TRef)child).getString());
+    		  }
+    	  }
+    	  return builder.toString();
+      }
+      
+      private void setPaint(String style, Object value)
+      {
+          String value_string = "";
+          if (value==null)
+          {
+        	  value_string = "none";
+          }
+          else if (value instanceof Integer)
+          {
+        	  value_string = "#"+Integer.toHexString((Integer) value & 0xFFFFFF);
+          }
+          else if (value instanceof SVG.GradientElement)
+          {
+        	  value_string = ((SVG.GradientElement) value).id;
+        	  if (value_string == null || "".equals(value_string))
+        	  {
+        		  return;
+        	  }
+        	  value_string = "url(#"+value_string+")";
+          }
+          else if (value instanceof SVG.SolidColor)
+          {
+        	  value_string = ((SVG.SolidColor) value).id;
+        	  if (value_string == null || "".equals(value_string))
+        	  {
+        		  return;
+        	  }
+        	  value_string = "url(#"+value_string+")";
+          }
+          else if (value instanceof SVG.Pattern)
+          {
+        	  value_string = ((SVG.Pattern) value).id;
+        	  if (value_string == null || "".equals(value_string))
+        	  {
+        		  return;
+        	  }
+        	  value_string = "url(#"+value_string+")";
+          }
+          else if (value instanceof SVG.PaintReference)
+          {
+        	  value_string = "url("+((SVG.PaintReference)value).href+") "+((SVG.PaintReference)value).fallback;
+          }
+          else if (value instanceof String)
+          {
+        	  value_string = (String)value;
+          }
+          else
+          {
+        	  return;
+          }
+          try{
+    			setStyle(style, value_string);
+          }catch (SAXException e){
+    			e.printStackTrace();
+          }
       }
    }
 
@@ -1998,7 +2901,19 @@ public class SVG
       public Length getFirstDX() { return this.dx == null || this.dx.size() == 0 ? null : this.dx.get(0); }
       public Length getFirstDY() { return this.dy == null || this.dy.size() == 0 ? null : this.dy.get(0); }
 
-
+      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
+      {
+          if (this.boundingBox == null) {
+        	  TextBoundsCalculator  proc = renderer.new TextBoundsCalculator(x.get(0).floatValueX(renderer), y.get(0).floatValueY(renderer));
+              renderer.enumerateTextSpans(this, proc);
+              this.boundingBox = new Box(proc.bbox.left, proc.bbox.top, proc.bbox.width(), proc.bbox.height());
+           }
+           rect.top    = boundingBox.minY;
+           rect.left   = boundingBox.minX;
+           rect.right  = rect.left + boundingBox.width;
+           rect.bottom = rect.top + boundingBox.height;
+      }
+ 
    }
 
 
@@ -2055,6 +2970,21 @@ public class SVG
       public void  setTextRoot(TextRoot obj) { this.textRoot = obj; }
       @Override
       public TextRoot  getTextRoot() { return this.textRoot; }
+      
+      @Override
+      public String getString()
+      {
+    	  if (href != null && href.startsWith("#"))
+    	  {
+    		  String id = href.substring(1);
+    		  SvgObject ref = document.getElementById(id);
+    		  if (ref instanceof TextContainer)
+    		  {
+    			  return ((TextContainer)ref).getString();
+    		  }
+    	  }
+    	  return super.getString();
+      }
    }
 
 
@@ -2219,6 +3149,19 @@ public class SVG
 
       @Override
       public void setTransform(Matrix transform) { this.transform = transform; }
+      
+      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
+      {
+    	  rect.left   = x.floatValue(renderer);
+    	  rect.top    = y.floatValue(renderer);
+    	  rect.right  = rect.left + width.floatValue(renderer);
+    	  rect.bottom = rect.top  + height.floatValue(renderer);
+    	  if (transform != null)
+    	  {
+    		  transform.mapRect(rect);
+    	  }
+      }
+      
    }
 
 
@@ -2295,7 +3238,7 @@ public class SVG
    }
 
 
-   protected static class PathDefinition implements PathInterface
+   public static class PathDefinition implements PathInterface
    {
       private byte[]   commands = null;
       private int      commandsLength = 0;
@@ -2512,4 +3455,7 @@ public class SVG
    }
 
 
+  
+
+   
 }

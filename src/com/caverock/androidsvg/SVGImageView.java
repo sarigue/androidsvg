@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.lang.reflect.Method;
 
 
+
 import com.caverock.androidsvg.SVG.Box;
 import com.caverock.androidsvg.SVG.Length;
 
@@ -35,6 +36,7 @@ import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Picture;
+import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.PictureDrawable;
@@ -59,9 +61,11 @@ public class SVGImageView extends ImageView
 {
    private static Method  setLayerTypeMethod = null;
 
-   private SVG mSvg = null;
    private SVGAndroidRenderer mRenderer = null;
    private Matrix    mImageMatrixRevert = new Matrix();
+   private RectF     mBounds = null;
+   private Paint     mBoundsPaint = null;
+   private SVG       mSvg = null;
 
    {
       try
@@ -91,9 +95,18 @@ public class SVGImageView extends ImageView
       init(attrs, defStyle);
    }
 
+   public void setBounds(RectF rect)
+   {
+	   mBounds = rect;
+   }
+   
+   public void setBoundPaint(Paint paint)
+   {
+	   mBoundsPaint = paint;
+   }
    
    @SuppressLint("NewApi")
-private void  init(AttributeSet attrs, int defStyle)
+   private void  init(AttributeSet attrs, int defStyle)
    {
 	  // if (isInEditMode()) return;
 
@@ -166,6 +179,10 @@ private void  init(AttributeSet attrs, int defStyle)
 		   super.onDraw(canvas);
 	   }
 	   getImageMatrix().invert(mImageMatrixRevert);
+	   if (mBounds != null && mBoundsPaint != null)
+	   {
+		   canvas.drawRect(mBounds, mBoundsPaint);
+	   }
 	}
    
 
@@ -173,28 +190,53 @@ private void  init(AttributeSet attrs, int defStyle)
    {
 	   if (mRenderer == null)
 	   {
-		   SVG.Svg rootElement = mSvg.getRootElement();
-		   Length  width = rootElement.width;
-		   if (width != null)
-	       {
-	         float w = width.floatValue(mSvg.getRenderDPI());
-	         float h;
-	         Box  rootViewBox = rootElement.viewBox;
-	         if (rootViewBox != null)
-	         {
-	            h = w * rootViewBox.height / rootViewBox.width;
-	         }
-	         else
-	         {
-	            Length  height = rootElement.height;
-	            h = (height != null) ? height.floatValue(mSvg.getRenderDPI()) : w;
-	         }
-			   mRenderer = new SVGAndroidRenderer(canvas, new Box(0f, 0f, w, h), mSvg.getRenderDPI());
-	       }
+		   mRenderer = getNewRenderer(mSvg);
 	   }
+	   mRenderer.setCanvas(canvas);
+	   return mRenderer;
+   }
+   
+   protected SVGAndroidRenderer getNewRenderer(SVG svg)
+   {
+
+	   SVG.Svg rootElement = svg.getRootElement();
+	   Length  width = rootElement.width;
+	   if (width != null)
+       {
+         float w = width.floatValue(svg.getRenderDPI());
+         float h;
+         Box  rootViewBox = rootElement.viewBox;
+         if (rootViewBox != null)
+         {
+            h = w * rootViewBox.height / rootViewBox.width;
+         }
+         else
+         {
+            Length  height = rootElement.height;
+            h = (height != null) ? height.floatValue(svg.getRenderDPI()) : w;
+         }
+		   return new SVGAndroidRenderer(null, new Box(0f, 0f, w, h), svg.getRenderDPI());
+       }
+	   
+	   return null;
+   }
+   
+   public SVGAndroidRenderer getRenderer()
+   {
+	   if (mRenderer == null) mRenderer = getNewRenderer(mSvg);
 	   return mRenderer;
    }
 
+   public Matrix getImageMatrixRevert()
+   {
+	   return mImageMatrixRevert;
+   }
+   
+   public SVG getSVG()
+   {
+	   return mSvg;
+   }
+   
    /**
     * Directly set the SVG.
     */
@@ -206,6 +248,7 @@ private void  init(AttributeSet attrs, int defStyle)
       setSoftwareLayerType();
       setImageDrawable(new PictureDrawable(mysvg.renderToPicture()));
 	  mSvg = mysvg;
+	  mRenderer = getNewRenderer(mSvg);
    }
 
 
