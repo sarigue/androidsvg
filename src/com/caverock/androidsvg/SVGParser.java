@@ -805,11 +805,14 @@ public class SVGParser extends DefaultHandler2
          case title:
          case desc:
             inMetadataElement = false;
-            if (metadataTag == SVGElem.title)
-               svgDocument.setTitle(metadataElementContents.toString());
-            else if (metadataTag == SVGElem.desc)
-               svgDocument.setDesc(metadataElementContents.toString());
-            metadataElementContents.setLength(0);
+            if (metadataElementContents != null)
+            {
+               if (metadataTag == SVGElem.title)
+                  svgDocument.setTitle(metadataElementContents.toString());
+               else if (metadataTag == SVGElem.desc)
+                  svgDocument.setDesc(metadataElementContents.toString());
+               metadataElementContents.setLength(0);
+            }
             return;
 
          case style:
@@ -1707,7 +1710,7 @@ public class SVGParser extends DefaultHandler2
 
    private void  linearGradient(Attributes attributes) throws SAXException
    {
-      debug("<linearGradiant>");
+      debug("<linearGradient>");
 
       if (currentElement == null)
          throw new SAXException("Invalid document. Root element must be <svg>");
@@ -1844,7 +1847,7 @@ public class SVGParser extends DefaultHandler2
 
 
    //=========================================================================
-   // Gradiant <stop> element
+   // Gradient <stop> element
 
 
    private void  stop(Attributes attributes) throws SAXException
@@ -1854,7 +1857,7 @@ public class SVGParser extends DefaultHandler2
       if (currentElement == null)
          throw new SAXException("Invalid document. Root element must be <svg>");
       if (!(currentElement instanceof SVG.GradientElement))
-         throw new SAXException("Invalid document. <stop> elements are only valid inside <linearGradiant> or <radialGradient> elements.");
+         throw new SAXException("Invalid document. <stop> elements are only valid inside <linearGradient> or <radialGradient> elements.");
       SVG.Stop  obj = new SVG.Stop();
       obj.document = svgDocument;
       obj.parent = currentElement;
@@ -1874,7 +1877,7 @@ public class SVGParser extends DefaultHandler2
          switch (SVGAttr.fromString(attributes.getLocalName(i)))
          {
             case offset:
-               obj.offset = parseGradiantOffset(val);
+               obj.offset = parseGradientOffset(val);
                break;
             default:
                break;
@@ -1883,7 +1886,7 @@ public class SVGParser extends DefaultHandler2
    }
 
 
-   private Float parseGradiantOffset(String val) throws SAXException
+   private Float  parseGradientOffset(String val) throws SAXException
    {
       if (val.length() == 0)
          throw new SAXException("Invalid offset value in <stop> (empty string)");
