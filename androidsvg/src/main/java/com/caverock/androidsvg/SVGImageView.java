@@ -168,7 +168,7 @@ public class SVGImageView extends ImageView
       if (attrs == null) return; // stop...
 
       // if (isInEditMode()) return;
-
+/*
       TypedArray a = getContext().getTheme().obtainStyledAttributes(attrs, R.styleable.SVGImageView, defStyle, 0);
       
       try 
@@ -214,6 +214,7 @@ public class SVGImageView extends ImageView
       {
          a.recycle();
       }
+      */
    }
 
    
