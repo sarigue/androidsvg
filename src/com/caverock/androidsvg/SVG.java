@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -42,6 +41,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
+import android.graphics.Paint;
 import android.graphics.Paint.Cap;
 import android.graphics.Paint.Join;
 import android.graphics.Picture;
@@ -53,8 +53,7 @@ import com.caverock.androidsvg.CSSParser.Ruleset;
 import com.caverock.androidsvg.SVG.Style.FontStyle;
 import com.caverock.androidsvg.SVG.Style.TextDecoration;
 import com.caverock.androidsvg.SVG.Style.TextDirection;
-import com.caverock.androidsvg.SVGAndroidRenderer.PathConverter;
-import com.caverock.androidsvg.SVGAndroidRenderer.TextBoundsCalculator;
+
 
 /**
  * AndroidSVG is a library for reading, parsing and rendering SVG documents on Android devices.
@@ -585,11 +584,36 @@ public class SVG
 
    public Bitmap getBitmap(int width, int height, int backgroundColor)
    {
-	   Bitmap bitmap = Bitmap.createBitmap(width, height, Config.ARGB_8888);
-	   Canvas canvas = new Canvas(bitmap);
-	   canvas.drawColor(backgroundColor);
-	   this.renderToCanvas(canvas);
-	   return bitmap;
+      try
+      {
+         Bitmap bitmap = Bitmap.createBitmap(width, height, Config.ARGB_8888);
+         Canvas canvas = new Canvas(bitmap);
+         canvas.drawColor(backgroundColor);
+         this.renderToCanvas(canvas);
+         return bitmap;
+      }
+      catch(OutOfMemoryError err)
+      {
+         String message = "OutOfMemory while creating bitmap";
+         Log.e(TAG, message);
+         try
+         {
+            Paint paint = new Paint();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.RED);
+            paint.setTextSize(20);
+            int w = (int)paint.measureText(message);
+            Bitmap bitmap = Bitmap.createBitmap(50, w+10, Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            canvas.drawColor(Color.WHITE);
+            canvas.drawText(message, 5, 5, paint);
+            return bitmap;
+         }
+         catch(OutOfMemoryError e)
+         {
+            return null;
+         }
+      }
    }
    
    /**
@@ -1846,7 +1870,7 @@ public class SVG
 
 
    // Any object in the tree that corresponds to an SVG element
-   public static class SvgElementBase extends SvgObject implements Cloneable
+   public static abstract class SvgElementBase extends SvgObject implements Cloneable
    {
       public String        id = null;
       public Boolean       spacePreserve = null;
@@ -1854,6 +1878,44 @@ public class SVG
       public Style         style = new Style();                  // style expressed in a 'style' attribute (eg. style="fill:black")
       public List<String>  classNames = new ArrayList<String>(); // contents of the 'class' attribute
       
+      public SvgElementBase()
+      {
+    	  this._initID();
+      }
+      
+      protected void _initID()
+      {
+    	  // this.id = this.getClass().getSimpleName()+"-"+UUID.randomUUID().toString();
+    	  this.id = this.getClass().getSimpleName()+String.valueOf(this.hashCode());
+      }
+      
+      public void getBounds(RectF bound, SVGAndroidRenderer renderer)
+      {
+         if (this instanceof SvgElement)
+         {
+            SVGMeasure.getBounds((SvgElement)this, bound, renderer);
+         }
+         else 
+         {
+            bound.left =  0;
+            bound.right = 0;
+            bound.top = 0;
+            bound.bottom = 0;
+         }
+      }
+      
+      public float[] getPoints(SVGAndroidRenderer renderer)
+      {
+         if (this instanceof SvgElement)
+         {
+            return SVGMeasure.getPoints((SvgElement)this, renderer);
+         }
+         else
+         {
+            return null;
+         }
+      }
+
       public void setStyle(String name, String value) throws SAXException
       {
     	  if (this.style == null) this.style = new Style();
@@ -1969,9 +2031,9 @@ public class SVG
       @Override
       public List<SvgObject>  getChildren() { return children; }
       @Override
-      public void addChild(SvgObject elem) throws SAXException  { elem.parent = this; children.add(elem); }
+      public void addChild(SvgObject elem) throws SAXException  { elem.parent = this; children.add(elem); if (elem.document == null) elem.document = document;}
       @Override
-      public void addChild(int index, SvgObject elem) throws SAXException { elem.parent = this; children.add(index, elem); }
+      public void addChild(int index, SvgObject elem) throws SAXException { elem.parent = this; children.add(index, elem); if (elem.document == null) elem.document = document;}
       @Override
       public SvgObject getElementById(String id) throws SAXException { SvgObject elem = document.getElementById(id); return (elem.parent != null && elem.parent.equals(this.parent)) ? elem : null;  }
       @Override
@@ -2053,41 +2115,18 @@ public class SVG
     	  for(int i=children.size()-1; i>=0; i--)
     	  {
     		  SvgObject child = children.get(i);
-    		  if (child instanceof GraphicsElement)
+    		  if (
+    		           child instanceof Image
+    		        || child instanceof TextPositionedContainer
+                 || child instanceof GraphicsElement
+    		        || child instanceof Group
+	        )
     		  {
-    			  GraphicsElement e = (GraphicsElement)child;
-    			  e.getBounds(bounds, renderer);
-    			  if (bounds.contains(x, y))
-    			  {
-    				  return e;
-    			  }
-    		  }
-    		  else if (child instanceof TextPositionedContainer)
-    		  {
-    			  TextPositionedContainer e = (TextPositionedContainer)child;
-    			  e.getBounds(bounds, renderer);
-    			  if (bounds.contains(x, y))
-    			  {
-    				  return e;
-    			  }
-    		  }
-    		  else if (child instanceof Group)
-    		  {
-    			  Group e = (Group)child;
-    			  e.getBounds(bounds, renderer);
-    			  if (bounds.contains(x, y))
-    			  {
-    				  return e;
-    			  }
-    		  }
-    		  else if (child instanceof Image)
-    		  {
-    			  Image e = (Image)child;
-    			  e.getBounds(bounds, renderer);
-    			  if (bounds.contains(x, y))
-    			  {
-    				  return e;
-    			  }
+    		     ((SvgElementBase)child).getBounds(bounds, renderer);
+              if (bounds.contains(x, y))
+              {
+                 return (SvgElementBase)child;
+              }
     		  }
     	  }
     	  return null;
@@ -2103,58 +2142,6 @@ public class SVG
       @Override
       public void setTransform(Matrix transform) { this.transform = transform; }
       
-      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
-      {
-    	  rect.left = 0;
-    	  rect.right = 0;
-    	  rect.top = 0;
-    	  rect.bottom = 0;
-    	  RectF childBounds = new RectF();
-    	  for(SvgObject child : children)
-    	  {
-    		  if (child instanceof Image)
-    		  {
-    			  ((Image)child).getBounds(childBounds, renderer);
-    			  if (rect.width() == 0)
-    			  {
-    				  rect.left = childBounds.left;
-    				  rect.right = childBounds.right;
-    				  rect.top = childBounds.top;
-    				  rect.bottom = childBounds.bottom;
-    			  }
-    			  rect.union(childBounds);
-    		  }
-    		  else if (child instanceof GraphicsElement)
-    		  {
-    			  ((GraphicsElement)child).getBounds(childBounds, renderer);
-    			  if (rect.width() == 0)
-    			  {
-    				  rect.left = childBounds.left;
-    				  rect.right = childBounds.right;
-    				  rect.top = childBounds.top;
-    				  rect.bottom = childBounds.bottom;
-    			  }
-    			  rect.union(childBounds);
-    		  }
-    		  else if (child instanceof TextPositionedContainer)
-    		  {
-    			  ((TextPositionedContainer)child).getBounds(childBounds, renderer);
-    			  if (rect.width() == 0)
-    			  {
-    				  rect.left = childBounds.left;
-    				  rect.right = childBounds.right;
-    				  rect.top = childBounds.top;
-    				  rect.bottom = childBounds.bottom;
-    			  }
-    			  rect.union(childBounds);
-    		  }
-    	  }
-    	  if (transform != null)
-    	  {
-    		  transform.mapRect(rect);
-    	  }
-      }
-
    }
 
 
@@ -2172,21 +2159,12 @@ public class SVG
 
    // One of the element types that can cause graphics to be drawn onto the target canvas.
    // Specifically: �circle�, �ellipse�, �image�, �line�, �path�, �polygon�, �polyline�, �rect�, �text� and �use�.
-   public static abstract class GraphicsElement extends SvgConditionalElement implements HasTransform, IsColoriable
+   protected static abstract class GraphicsElement extends SvgConditionalElement implements HasTransform, IsColoriable
    {
       public Matrix  transform;
 
       @Override
       public void setTransform(Matrix transform) { this.transform = transform; }
-
-      public RectF getBounds(SVGAndroidRenderer renderer)
-      {
-    	  RectF rect = new RectF();
-    	  getBounds(rect, renderer);
-    	  return rect;
-      }
-      
-      public abstract void getBounds(RectF rect, SVGAndroidRenderer renderer);
       
       public void setStrokeNone()
       {
@@ -2398,6 +2376,20 @@ public class SVG
       public Length  y;
       public Length  width;
       public Length  height;
+      
+      public void setReference(SvgElementBase element)
+      {
+    	  if (element.id == null || element.id == "")
+    	  {
+    		  element._initID();
+    	  }
+    	  this.setReference(element.id);
+      }
+      
+      public void setReference(String idElement)
+      {
+    	  this.href = '#' + idElement;
+      }
    }
 
 
@@ -2405,18 +2397,6 @@ public class SVG
    {
       public PathDefinition  d;
       public Float           pathLength;
-      
-      @Override
-      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
-      {
-    	  PathConverter converter = new PathConverter(d);
-    	  android.graphics.Path p = converter.getPath();
-    	  p.computeBounds(rect, true);
-    	  if (transform != null)
-    	  {
-    		  transform.mapRect(rect);
-    	  }
-      }
    }
 
 
@@ -2428,19 +2408,6 @@ public class SVG
       public Length  height;
       public Length  rx;
       public Length  ry;
-      
-      @Override
-      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
-      {
-    	 rect.left = (x == null) ? 0 : x.floatValue(renderer);
-    	 rect.top  = (y == null) ? 0 : y.floatValue(renderer);
-    	 rect.right  = rect.left + (width == null ? 0 : width.floatValue(renderer));
-    	 rect.bottom = rect.top  + (height == null ? 0 : height.floatValue(renderer));
-       	  if (transform != null)
-       	  {
-       		  transform.mapRect(rect);
-       	  }
-      }
    }
 
 
@@ -2449,21 +2416,6 @@ public class SVG
       public Length  cx;
       public Length  cy;
       public Length  r;
-      
-      @Override
-      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
-      {
-    	 float r = (this.r == null) ? 0f : this.r.floatValue(renderer);
-    	 rect.left = cx == null ? 0 : cx.floatValue(renderer) - r;
-    	 rect.top  = cy == null ? 0 : cy.floatValue(renderer) - r;
-    	 rect.right  = rect.left + 2*r;
-    	 rect.bottom = rect.top  + 2*r;
-       	  if (transform != null)
-       	  {
-       		  transform.mapRect(rect);
-       	  }
-      }
-
    }
 
 
@@ -2473,21 +2425,6 @@ public class SVG
       public Length  cy;
       public Length  rx;
       public Length  ry;
-
-      @Override
-      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
-      {
-    	 float rx = this.rx == null ? 0 : this.rx.floatValue(renderer);
-    	 float ry = this.ry == null ? 0 : this.ry.floatValue(renderer);
-    	 rect.left = cx == null ? 0 : cx.floatValue(renderer) - rx;
-    	 rect.top  = cy == null ? 0 : cy.floatValue(renderer) - ry;
-    	 rect.right  = rect.left + 2*rx;
-    	 rect.bottom = rect.top  + 2*ry;
-       	  if (transform != null)
-       	  {
-       		  transform.mapRect(rect);
-       	  }
-      }
    }
 
 
@@ -2497,51 +2434,12 @@ public class SVG
       public Length  y1;
       public Length  x2;
       public Length  y2;
-      
-      @Override
-      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
-      {
-    	 rect.left = x1 == null ? 0 : x1.floatValue(renderer);
-    	 rect.top  = y1 == null ? 0 : y1.floatValue(renderer);
-    	 rect.right  = x2 == null ? 0 : x2.floatValue(renderer);
-    	 rect.bottom = y2 == null ? 0 : y2.floatValue(renderer);
-    	 rect.sort();
-       	  if (transform != null)
-       	  {
-       		  transform.mapRect(rect);
-       	  }
-      }
    }
 
 
    public static class PolyLine extends GraphicsElement
    {
       public float[]  points;
-
-      @Override
-      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
-      {
-    	  rect.left   = 0;
-    	  rect.top    = 0;
-    	  rect.right  = 0;
-    	  rect.bottom = 0;
-    	  if (points != null)
-    	  {
-        	  for(int i=0; i<points.length-1; i=i+2)
-        	  {
-        		 float x = points[i];
-        		 float y = points[i+1];
-        		 if (x < rect.left)   rect.left   = x;
-        		 if (x > rect.right)  rect.right  = x;
-        		 if (y < rect.top)    rect.top    = y;
-        		 if (y > rect.bottom) rect.bottom = y;
-        	  }
-    	  }
-    	  if (transform != null)
-    	  {
-    		  transform.mapRect(rect);
-    	  }
-      }
    }
 
 
@@ -2564,7 +2462,7 @@ public class SVG
    }
    
 
-   protected static class  TextContainer extends SvgConditionalContainer implements IsColoriable
+   protected static abstract class  TextContainer extends SvgConditionalContainer implements IsColoriable
    {
       @Override
       public void  addChild(SvgObject elem) throws SAXException
@@ -2843,7 +2741,7 @@ public class SVG
    }
 
 
-   public static class  TextPositionedContainer extends TextContainer
+   public static abstract class  TextPositionedContainer extends TextContainer
    {
       public List<Length>  x = new ArrayList<Length>();
       public List<Length>  y = new ArrayList<Length>();
@@ -2900,20 +2798,6 @@ public class SVG
       public Length getFirstY() { return this.y == null || this.y.size() == 0 ? null : this.y.get(0); }
       public Length getFirstDX() { return this.dx == null || this.dx.size() == 0 ? null : this.dx.get(0); }
       public Length getFirstDY() { return this.dy == null || this.dy.size() == 0 ? null : this.dy.get(0); }
-
-      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
-      {
-          if (this.boundingBox == null) {
-        	  TextBoundsCalculator  proc = renderer.new TextBoundsCalculator(x.get(0).floatValueX(renderer), y.get(0).floatValueY(renderer));
-              renderer.enumerateTextSpans(this, proc);
-              this.boundingBox = new Box(proc.bbox.left, proc.bbox.top, proc.bbox.width(), proc.bbox.height());
-           }
-           rect.top    = boundingBox.minY;
-           rect.left   = boundingBox.minX;
-           rect.right  = rect.left + boundingBox.width;
-           rect.bottom = rect.top + boundingBox.height;
-      }
- 
    }
 
 
@@ -3149,19 +3033,7 @@ public class SVG
 
       @Override
       public void setTransform(Matrix transform) { this.transform = transform; }
-      
-      public void getBounds(RectF rect, SVGAndroidRenderer renderer)
-      {
-    	  rect.left   = x.floatValue(renderer);
-    	  rect.top    = y.floatValue(renderer);
-    	  rect.right  = rect.left + width.floatValue(renderer);
-    	  rect.bottom = rect.top  + height.floatValue(renderer);
-    	  if (transform != null)
-    	  {
-    		  transform.mapRect(rect);
-    	  }
-      }
-      
+
    }
 
 

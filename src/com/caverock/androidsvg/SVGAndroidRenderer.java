@@ -123,10 +123,10 @@ public class SVGAndroidRenderer
 
    private static final String DEFAULT_FONT_FAMILY = "sans-serif";
 
-   private static HashSet<String>  supportedFeatures = null;
+   protected static HashSet<String>  supportedFeatures = null;
 
 
-   private class RendererState implements Cloneable
+   protected class RendererState implements Cloneable
    {
       public Style    style;
       public boolean  hasFill;
@@ -176,6 +176,11 @@ public class SVGAndroidRenderer
 
    }
 
+   protected RendererState getState()
+   {
+      if (state == null) resetState();
+      return state;
+   }
 
    private void  resetState()
    {
@@ -907,7 +912,7 @@ public class SVGAndroidRenderer
    }
 
 
-   private static synchronized void  initialiseSupportedFeaturesMap()
+   protected static synchronized void  initialiseSupportedFeaturesMap()
    {
       supportedFeatures = new HashSet<String>();
 

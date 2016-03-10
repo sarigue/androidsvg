@@ -1,6 +1,7 @@
 package com.caverock.androidsvg.listeners;
 
 import android.annotation.SuppressLint;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.DashPathEffect;
 import android.graphics.Paint;
@@ -26,10 +27,23 @@ public class SelectListener implements OnTouchListener
 	private RectF mBounds = new RectF();
 	private Paint mPaint  = new Paint();
 	private OnSelectedListener mListener = null;
-	
+
 	public SelectListener(SVGImageView imageView)
 	{
 		mImageView = imageView;
+		mImageView.getOnDrawListenerList().add(new SVGImageView.OnDrawListener() {
+	      @Override public void beforeTransform(Canvas canvas){};
+	      @Override public void beforeDraw(Canvas canvas){};
+	      @Override public void afterRestore(Canvas canvas){};
+	      @Override
+	      public void afterDraw(Canvas canvas)
+	      {
+	         if (mPaint != null && ! mBounds.isEmpty())
+	         {
+	            canvas.drawRect(mBounds, mPaint);
+	         }
+	      }
+		});
 		mPaint.setColor(Color.BLACK);
 		mPaint.setStyle(Style.STROKE);
 		mPaint.setPathEffect(new DashPathEffect(new float[]{10, 10}, 0));
@@ -47,73 +61,43 @@ public class SelectListener implements OnTouchListener
 		mListener = listener;
 	}
 	
-	@SuppressLint("NewApi")
+	public Paint getBoundPaint()
+	{
+	   return mPaint;
+	}
+
+	
+	@SuppressLint({"ClickableViewAccessibility"})
 	@Override
 	public boolean onTouch(View v, MotionEvent event)
 	{
-		if (mImageView == null) return v.onTouchEvent(event);
-		if (mImageView.getSVG() == null) return v.onTouchEvent(event);
+	   
+		if (mImageView               == null) return v.onTouchEvent(event);
+		if (mImageView.getSVG()      == null) return v.onTouchEvent(event);
 		if (mImageView.getRenderer() == null) return v.onTouchEvent(event);
 
-		if (event.getPointerCount() > 1) return v.onTouchEvent(event);
-		
+		if (event.getPointerCount() > 1)      return v.onTouchEvent(event);
 		if (event.getActionMasked() != MotionEvent.ACTION_DOWN) return v.onTouchEvent(event);
 		
 		float[] point = new float[]{event.getX(), event.getY()};
 		mImageView.getImageMatrixRevert().mapPoints(point);
-		SVG.SvgElementBase o = mImageView.getSVG().getRootElement().getTopElement(point[0], point[1], mImageView.getRenderer());
-		mBounds.left = 0;
-		mBounds.right = 0;
-		mBounds.top = 0;
-		mBounds.bottom = 0;
-		if (o != null)
+		
+		SVG.SvgElementBase selected = mImageView.getSVG().getRootElement().getTopElement(point[0], point[1], mImageView.getRenderer());
+		
+		if (selected != null)
 		{
-			if (o instanceof SVG.Image)
-			{
-				((SVG.Image)o).getBounds(mBounds, mImageView.getRenderer());
-			}
-			else if (o instanceof SVG.Group)
-			{
-				((SVG.Group)o).getBounds(mBounds, mImageView.getRenderer());
-			}
-			else if (o instanceof SVG.TextPositionedContainer)
-			{
-				((SVG.TextPositionedContainer)o).getBounds(mBounds, mImageView.getRenderer());
-			}
-			else if (o instanceof SVG.GraphicsElement)
-			{
-				((SVG.GraphicsElement)o).getBounds(mBounds, mImageView.getRenderer());
-			}
+		   selected.getBounds(mBounds, mImageView.getRenderer());
+	      onSelected(selected, mBounds, mImageView);
 		}
-		
-		onSelected(o, mBounds, mImageView);
-		
-		Log.d("ONTOUCH", String.valueOf(o) + " : " + mBounds.toShortString());
+      mImageView.invalidate();
 
-		if (mPaint == null)
-		{
-			return true;
-		}
-		
-		if (mBounds.width() > 0)
-		{
-			mImageView.getImageMatrix().mapRect(mBounds);
-			mImageView.setBounds(mBounds);
-			mImageView.setBoundPaint(mPaint);
-		}
-		else
-		{
-			mImageView.setBounds(null);
-			mImageView.setBoundPaint(null);
-		}
-		
-		mImageView.invalidate();
-		
 		return true;
 	}
 	
+	
 	public void onSelected(SVG.SvgElementBase element, RectF bounds, SVGImageView imageView)
 	{
+	   Log.i("Selected", element.getClass().getSimpleName());
 		if (mListener != null)
 		{
 			mListener.onSelected(element, bounds, imageView);

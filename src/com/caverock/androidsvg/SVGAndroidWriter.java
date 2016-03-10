@@ -228,31 +228,40 @@ public class SVGAndroidWriter
 	   if (SVG.OutputFormat.jpg.equals(format))
 	   {
 		   Bitmap bmp = svg.getBitmap(backgroundColor);
-		   bmp.compress(CompressFormat.JPEG, 90, os);
-		   os.close();
-		   bmp.recycle();
-		   bmp = null;
-		   ExifInterface exif = new ExifInterface(file.getAbsolutePath());
-		   exif.setAttribute(ExifInterface.TAG_MAKE, "SVGAndroidWriter (package com.caverock.androidsvg)");
-		   exif.setAttribute(ExifInterface.TAG_FLASH, "0");
-		   exif.setAttribute(ExifInterface.TAG_IMAGE_LENGTH, svg.getDocumentHeight()+"px");
-		   exif.setAttribute(ExifInterface.TAG_IMAGE_WIDTH, svg.getDocumentWidth()+"px");
+		   if (bmp != null)
+		   {
+	         bmp.compress(CompressFormat.JPEG, 90, os);
+	         os.close();
+	         bmp.recycle();
+	         bmp = null;
+	         ExifInterface exif = new ExifInterface(file.getAbsolutePath());
+	         exif.setAttribute(ExifInterface.TAG_MAKE, "SVGAndroidWriter (package com.caverock.androidsvg)");
+	         exif.setAttribute(ExifInterface.TAG_FLASH, "0");
+	         exif.setAttribute(ExifInterface.TAG_IMAGE_LENGTH, svg.getDocumentHeight()+"px");
+	         exif.setAttribute(ExifInterface.TAG_IMAGE_WIDTH, svg.getDocumentWidth()+"px");
+		   }
 	   }
 	   else if (SVG.OutputFormat.png.equals(format))
 	   {
 		   Bitmap bmp = svg.getBitmap();
-		   bmp.compress(CompressFormat.PNG, 90, os);
-		   os.close();
-		   bmp.recycle();
-		   bmp = null;
+		   if (bmp != null)
+		   {
+	         bmp.compress(CompressFormat.PNG, 90, os);
+	         os.close();
+	         bmp.recycle();
+	         bmp = null;
+		   }
 	   }
 	   else if (SVG.OutputFormat.webp.equals(format))
 	   {
 		   Bitmap bmp = svg.getBitmap();
-		   bmp.compress(CompressFormat.WEBP, 90, os);
-		   os.close();
-		   bmp.recycle();
-		   bmp = null;
+		   if (bmp != null)
+		   {
+	         bmp.compress(CompressFormat.WEBP, 90, os);
+	         os.close();
+	         bmp.recycle();
+	         bmp = null;
+		   }
 	   }
 	   else if (SVG.OutputFormat.svg.equals(format))
 	   {
