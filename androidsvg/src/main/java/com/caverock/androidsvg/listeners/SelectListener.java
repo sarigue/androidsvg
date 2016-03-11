@@ -14,6 +14,7 @@ import android.view.View.OnTouchListener;
 
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGImageView;
+import com.caverock.androidsvg.SVGMeasure;
 
 public class SelectListener implements OnTouchListener
 {
@@ -79,10 +80,7 @@ public class SelectListener implements OnTouchListener
 		if (event.getPointerCount() > 1)      return v.onTouchEvent(event);
 		if (event.getActionMasked() != MotionEvent.ACTION_DOWN) return v.onTouchEvent(event);
 		
-		float[] point = new float[]{event.getX(), event.getY()};
-		mImageView.getImageMatrixRevert().mapPoints(point);
-		
-		SVG.SvgElementBase selected = mImageView.getSVG().getRootElement().getTopElement(point[0], point[1], mImageView.getRenderer());
+      SVG.SvgElementBase selected = SelectListener.getElementAt(mImageView, event.getX(), event.getY());
 		
 		if (selected != null)
 		{
@@ -102,6 +100,52 @@ public class SelectListener implements OnTouchListener
 		{
 			mListener.onSelected(element, bounds, imageView);
 		}
+	}
+	
+	
+	public static SVG.SvgElementBase getElementAt(SVGImageView view, float x, float y)
+	{
+      float[] point = new float[]{x, y};
+      view.getImageMatrixRevert().mapPoints(point);
+      return view.getSVG().getRootElement().getTopElement(point[0], point[1], view.getRenderer());
+	}
+	
+	
+	public static RectF borderElement(final SVGImageView view, SVG.SvgElementBase element, Paint paint)
+	{
+	   final RectF bounds = new RectF();
+	   
+      SVGMeasure.getBounds(element, bounds, view.getRenderer());
+      if (bounds.isEmpty())
+      {
+         return null;
+      }
+      
+      if (paint == null)
+      {
+         paint = new Paint();
+         paint.setColor(Color.BLACK);
+         paint.setStyle(Style.STROKE);
+         paint.setPathEffect(new DashPathEffect(new float[]{10, 10}, 0));
+         paint.setStrokeWidth(2);
+      }
+      final Paint borderPaint = paint;
+      
+	   SVGImageView.OnDrawListener l = new SVGImageView.OnDrawListener() {
+         @Override public void beforeTransform(Canvas canvas){};
+         @Override public void beforeDraw(Canvas canvas){};
+         @Override public void afterRestore(Canvas canvas){};
+         @Override
+         public void afterDraw(Canvas canvas)
+         {
+            canvas.drawRect(bounds, borderPaint);
+            view.getOnDrawListenerList().remove(this);
+         }
+      };
+      
+      view.getOnDrawListenerList().add(l);
+      view.invalidate();
+      return bounds;
 	}
 	
 }

@@ -2159,7 +2159,7 @@ public class SVG
 
    // One of the element types that can cause graphics to be drawn onto the target canvas.
    // Specifically: �circle�, �ellipse�, �image�, �line�, �path�, �polygon�, �polyline�, �rect�, �text� and �use�.
-   protected static abstract class GraphicsElement extends SvgConditionalElement implements HasTransform, IsColoriable
+   public static abstract class GraphicsElement extends SvgConditionalElement implements HasTransform, IsColoriable
    {
       public Matrix  transform;
 

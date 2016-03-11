@@ -39,7 +39,7 @@ public class SVGMeasure
     * @param bound
     * @param renderer
     */
-   public static void getBounds(SVG.SvgElement element, RectF bound, SVGAndroidRenderer renderer)
+   public static void getBounds(SVG.SvgElementBase element, RectF bound, SVGAndroidRenderer renderer)
    {
       bound.left = 0;
       bound.right = 0;
@@ -670,7 +670,101 @@ public class SVGMeasure
       return points;
    }
    
+   public static float[] getPosition(SVG.SvgElementBase element, SVGAndroidRenderer renderer)
+   {
+      RectF bound = new RectF();
+      getBounds(element, bound, renderer);
+      if (bound.isEmpty())
+      {
+         return null;
+      }
+      float[] translation = getTranslation(element);
+      float posX = bound.left + translation[0];
+      float posY = bound.top  + translation[1];
+      return new float[]{posX, posY};
+   }
    
+   public static float[] getTranslation(SVG.SvgElementBase element)
+   {
+      float[] values = new float[9];
+      if (element instanceof SVG.Group)
+      {
+         ((SVG.Group)element).transform.getValues(values);
+      }
+      else if (element instanceof SVG.Image)
+      {
+         ((SVG.Image)element).transform.getValues(values);
+      }
+      else if (element instanceof SVG.Text)
+      {
+         ((SVG.Text)element).transform.getValues(values);
+      }
+      else if (element instanceof SVG.GraphicsElement)
+      {
+         ((SVG.GraphicsElement)element).transform.getValues(values);
+      }
+      else
+      {
+         return new float[]{0,0};
+      }
+      return new float[]{values[Matrix.MTRANS_X], values[Matrix.MTRANS_Y]};
+   }
+
+   public static float getRotation(SVG.SvgElementBase element)
+   {
+      float[] values = new float[9];
+      if (element instanceof SVG.Group)
+      {
+         ((SVG.Group)element).transform.getValues(values);
+      }
+      else if (element instanceof SVG.Image)
+      {
+         ((SVG.Image)element).transform.getValues(values);
+      }
+      else if (element instanceof SVG.Text)
+      {
+         ((SVG.Text)element).transform.getValues(values);
+      }
+      else if (element instanceof SVG.GraphicsElement)
+      {
+         ((SVG.GraphicsElement)element).transform.getValues(values);
+      }
+      else
+      {
+         return 0;
+      }
+      return Math.round(Math.atan2(values[Matrix.MSKEW_X], values[Matrix.MSCALE_X]) * (180 / Math.PI));
+   }
+   
+   public static float getScale(SVG.SvgElementBase element)
+   {
+      float[] values = new float[9];
+      if (element instanceof SVG.Group)
+      {
+         ((SVG.Group)element).transform.getValues(values);
+      }
+      else if (element instanceof SVG.Image)
+      {
+         ((SVG.Image)element).transform.getValues(values);
+      }
+      else if (element instanceof SVG.Text)
+      {
+         ((SVG.Text)element).transform.getValues(values);
+      }
+      else if (element instanceof SVG.GraphicsElement)
+      {
+         ((SVG.GraphicsElement)element).transform.getValues(values);
+      }
+      else
+      {
+         return 1;
+      }
+      float scaleX = values[Matrix.MSCALE_X];
+      float skewY = values[Matrix.MSKEW_Y];
+      float scale = (float) Math.sqrt(scaleX * scaleX + skewY * skewY);
+      return scale;
+   }
+
    
    protected static boolean testConditionalObject(SVG.SvgConditional element, SVGAndroidRenderer renderer)
    {

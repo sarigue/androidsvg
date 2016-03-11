@@ -26,7 +26,6 @@ import java.util.List;
 
 import com.caverock.androidsvg.SVG.Box;
 import com.caverock.androidsvg.SVG.Length;
-import com.caverock.androidsvg.listeners.DrawListener;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
@@ -36,7 +35,6 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.Picture;
 import android.graphics.Shader;
 import android.graphics.drawable.BitmapDrawable;
@@ -153,8 +151,7 @@ public class SVGImageView extends ImageView
    {
       float[] values = new float[9];
       this.getImageMatrix().getValues(values);
-      return Math.round(Math.atan2(values[Matrix.MSKEW_X],
-            values[Matrix.MSCALE_X]) * (180 / Math.PI));
+      return Math.round(Math.atan2(values[Matrix.MSKEW_X], values[Matrix.MSCALE_X]) * (180 / Math.PI));
    }
 
    /**
@@ -224,8 +221,11 @@ public class SVGImageView extends ImageView
       getImageMatrix().invert(mImageMatrixRevert);
       if (mOnDrawListener != null)
       {
-         for(OnDrawListener listener : mOnDrawListener)
-            listener.beforeTransform(canvas);
+         synchronized(mOnDrawListener)
+         {
+            for(OnDrawListener listener : mOnDrawListener)
+               listener.beforeTransform(canvas);
+         }
       }
       
       if (mSvg != null)
@@ -234,14 +234,20 @@ public class SVGImageView extends ImageView
          canvas.setMatrix(getImageMatrix());
          if (mOnDrawListener != null)
          {
-            for(OnDrawListener listener : mOnDrawListener)
-               listener.beforeDraw(canvas);
+            synchronized(mOnDrawListener)
+            {
+               for(OnDrawListener listener : mOnDrawListener)
+                  listener.beforeDraw(canvas);
+            }
          }
          getOnDrawRenderer(canvas).renderDocument(mSvg, null, null, true);
          if (mOnDrawListener != null)
          {
-            for(OnDrawListener listener : mOnDrawListener)
-               listener.afterDraw(canvas);
+            synchronized(mOnDrawListener)
+            {
+               for(OnDrawListener listener : mOnDrawListener)
+                  listener.afterDraw(canvas);
+            }
          }
          canvas.restore();
       }
@@ -252,8 +258,11 @@ public class SVGImageView extends ImageView
       
       if (mOnDrawListener != null)
       {
-         for(OnDrawListener listener : mOnDrawListener)
-            listener.afterRestore(canvas);
+         synchronized(mOnDrawListener)
+         {
+            for(OnDrawListener listener : mOnDrawListener)
+               listener.afterRestore(canvas);
+         }
       }
       
    }

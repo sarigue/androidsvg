@@ -2,11 +2,15 @@ package com.caverock.androidsvg.listeners;
 
 import android.annotation.SuppressLint;
 import android.graphics.Matrix;
+import android.graphics.RectF;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnTouchListener;
 
+import com.caverock.androidsvg.SVG;
+import com.caverock.androidsvg.SVGAndroidRenderer;
 import com.caverock.androidsvg.SVGImageView;
+import com.caverock.androidsvg.SVGMeasure;
 
 public class MoveListener implements OnTouchListener
 {
@@ -211,6 +215,110 @@ public class MoveListener implements OnTouchListener
 		}
 
 	}
+	
+	public static void TranslateElement(SVG.SvgElementBase element, float dx, float dy)
+	{
+	   if (element == null)
+	   {
+	      return;
+	   }
+	   
+	   if (element instanceof SVG.Group)
+	   {
+	      if (((SVG.Group)element).transform == null)
+	      {
+	         ((SVG.Group)element).transform = new Matrix();
+	      }
+         ((SVG.Group)element).transform.postTranslate(dx, dy);
+	   }
+	   else if (element instanceof SVG.Image)
+      {
+         if (((SVG.Image)element).transform == null)
+         {
+            ((SVG.Image)element).transform = new Matrix();
+         }
+         ((SVG.Image)element).transform.postTranslate(dx, dy);
+      }
+      else if (element instanceof SVG.Text)
+      {
+         if (((SVG.Text)element).transform == null)
+         {
+            ((SVG.Text)element).transform = new Matrix();
+         }
+         ((SVG.Text)element).transform.postTranslate(dx, dy);
+      }
+      else if (element instanceof SVG.GraphicsElement)
+      {
+         if (((SVG.GraphicsElement)element).transform == null)
+         {
+            ((SVG.GraphicsElement)element).transform = new Matrix();
+         }
+         ((SVG.GraphicsElement)element).transform.postTranslate(dx, dy);
+      }
+	}
 
+	public static void MoveElementTo(SVG.SvgElementBase element, float x, float y, SVGAndroidRenderer renderer)
+	{
+	   if (element == null)
+	   {
+	      return;
+	   }
+
+	   float[] position = SVGMeasure.getPosition(element, renderer);
+      float dx = - position[0] + x;
+      float dy = - position[1] + y;
+      TranslateElement(element, dx, dy);
+   }
+
+	  
+	public static void ZoomElement(SVG.SvgElementBase element, float scale, SVGAndroidRenderer renderer)
+	{
+	   if (element == null)
+      {
+         return;
+      }
+
+	   RectF bounds = new RectF();
+	   SVGMeasure.getBounds(element, bounds, renderer);
+	   
+	   if (bounds.isEmpty())
+	   {
+	      return;
+	   }
+	     
+	   if (element instanceof SVG.Group)
+	   {
+         if (((SVG.Group)element).transform == null)
+         {
+            ((SVG.Group)element).transform = new Matrix();
+         }
+	      ((SVG.Group)element).transform.postScale(scale, scale, bounds.centerX(), bounds.centerY());
+	   }
+	   else if (element instanceof SVG.Image)
+	   {
+         if (((SVG.Image)element).transform == null)
+         {
+            ((SVG.Image)element).transform = new Matrix();
+         }
+	      ((SVG.Image)element).transform.postScale(scale, scale, bounds.centerX(), bounds.centerY());
+	   }  
+	   else if (element instanceof SVG.Text)
+	   {
+         if (((SVG.Text)element).transform == null)
+         {
+            ((SVG.Text)element).transform = new Matrix();
+         }
+	      ((SVG.Text)element).transform.postScale(scale, scale, bounds.centerX(), bounds.centerY());
+	   }
+	   else if (element instanceof SVG.GraphicsElement)
+	   {
+         if (((SVG.GraphicsElement)element).transform == null)
+         {
+            ((SVG.GraphicsElement)element).transform = new Matrix();
+         }
+	      ((SVG.GraphicsElement)element).transform.postScale(scale, scale, bounds.centerX(), bounds.centerY());
+	   }
+	} 
+	  
 
 }

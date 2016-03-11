@@ -1,10 +1,14 @@
 package com.caverock.androidsvg.listeners;
 
 import java.util.ArrayList;
+
 import org.xml.sax.SAXException;
+
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGAndroidRenderer;
 import com.caverock.androidsvg.SVGImageView;
+import com.caverock.androidsvg.extendedshapes.SVGExtendedShape;
+
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.content.Context;
@@ -12,6 +16,7 @@ import android.content.DialogInterface;
 import android.graphics.Matrix;
 import android.graphics.PointF;
 import android.text.InputType;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnTouchListener;
@@ -86,6 +91,19 @@ public class DrawListener implements OnTouchListener
 
    protected boolean startShape(float x, float y)
    {
+      Log.i("DrawListener", "start shape on shape "+mShape.getClass().getSimpleName());
+      if (mShape instanceof SVGExtendedShape){
+         if(((SVGExtendedShape)mShape).startShape(mRenderer, x, y))
+         {
+            mShape.appendToDocument(mImageView.getSVG());
+            mImageView.invalidate();
+            return true;
+         }
+         return false;
+      }
+      if (mShape instanceof SVGExtendedShape){
+         return ((SVGExtendedShape)mShape).startShape(mRenderer, x, y);
+      }
       if (mShape instanceof SVG.Line) {
          return startShape((SVG.Line) mShape, x, y);
       }
@@ -115,6 +133,14 @@ public class DrawListener implements OnTouchListener
 
    protected boolean changeShape(float x, float y)
    {
+      if (mShape instanceof SVGExtendedShape){
+         if(((SVGExtendedShape)mShape).changeShape(mRenderer, x, y))
+         {
+            mImageView.invalidate();
+            return true;
+         }
+         return false;
+      }
       if (mShape instanceof SVG.Line) {
          return changeShape((SVG.Line) mShape, x, y);
       }
@@ -144,6 +170,19 @@ public class DrawListener implements OnTouchListener
 
    protected boolean stopShape(float x, float y)
    {
+      if (mShape instanceof SVGExtendedShape){
+         if(((SVGExtendedShape)mShape).stopShape(mRenderer, x, y))
+         {
+            try {
+               mShape = mShape.clone();
+            }
+            catch (CloneNotSupportedException e) {
+               e.printStackTrace();
+            }
+            return true;
+         }
+         return false;
+      }
       if (mShape instanceof SVG.Line) {
          return stopShape((SVG.Line) mShape, x, y);
       }
