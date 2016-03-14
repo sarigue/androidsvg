@@ -122,7 +122,7 @@ public class SVG
    Map<String, SvgElementBase> idToElementMap = new HashMap<String, SvgElementBase>();
 
 
-   public enum OutputFormat
+   public static enum OutputFormat
    {
 	   jpg,
 	   webp,
@@ -131,7 +131,7 @@ public class SVG
 	   svgz
    }
    
-   public enum Unit
+   public static enum Unit
    {
       px,
       em,
@@ -148,7 +148,7 @@ public class SVG
    }
 
 
-   protected enum GradientSpread
+   protected static enum GradientSpread
    {
       pad,
       reflect,
@@ -494,6 +494,171 @@ public class SVG
 
       renderer.renderDocument(this, view.viewBox, view.preserveAspectRatio, true);
    }
+
+   //===============================================================================
+   // SVG document add another SVG
+
+   //SVG tux = SVG.getFromResource(this, R.raw.tux);
+
+   /**
+    * Read, parse and include an SVG from the given {@code InputStream}.
+    * 
+    * @param is the input stream from which to read the file.
+    * @return an SVG instance on which you can call one of the render methods.
+    * @throws SVGParseException if there is an error parsing the document.
+    * @throws SAXException 
+    */
+   public void addFromInputStream(InputStream is) throws SVGParseException, SAXException
+   {
+      SVG svgDocument = SVG.getFromInputStream(is);
+      addSVG(svgDocument).id += "inputstream";
+   }
+
+
+   /**
+    * Read, parse and include an SVG from the given {@code String}.
+    * 
+    * @param svg the String instance containing the SVG document.
+    * @return an SVG instance on which you can call one of the render methods.
+    * @throws SVGParseException if there is an error parsing the document.
+    * @throws SAXException 
+    */
+   public void addFromString(String svg) throws SVGParseException, SAXException
+   {
+      SVG svgDocument = SVG.getFromString(svg);
+      addSVG(svgDocument).id += "string";
+   }
+
+
+   /**
+    * Read, parse and include an SVG from the given resource location.
+    * 
+    * @param context the Android context of the resource.
+    * @param resourceId the resource identifier of the SVG document.
+    * @return an SVG instance on which you can call one of the render methods.
+    * @throws SVGParseException if there is an error parsing the document.
+    * @throws SAXException 
+    */
+   public void addFromResource(Context context, int resourceId) throws SVGParseException, SAXException
+   {
+      addFromResource(context.getResources(), resourceId);
+   }
+
+
+   /**
+    * Read, parse and include an SVG from the given resource location.
+    *
+    * @param resources the set of Resources in which to locate the file.
+    * @param resourceId the resource identifier of the SVG document.
+    * @return an SVG instance on which you can call one of the render methods.
+    * @throws SVGParseException if there is an error parsing the document.
+    * @throws SAXException 
+    */
+   public void addFromResource(Resources resources, int resourceId) throws SVGParseException, SAXException
+   {
+      SVG svg = SVG.getFromResource(resources, resourceId);
+      addSVG(svg).id += resources.getResourceEntryName(resourceId).toLowerCase(Locale.getDefault());
+   }
+
+
+   /**
+    * Read, parse and include an SVG from the assets folder.
+    * 
+    * @param assetManager the AssetManager instance to use when reading the file.
+    * @param filename the filename of the SVG document within assets.
+    * @return an SVG instance on which you can call one of the render methods.
+    * @throws SVGParseException if there is an error parsing the document.
+    * @throws IOException if there is some IO error while reading the file.
+    * @throws SAXException 
+    */
+   public void addFromAsset(AssetManager assetManager, String filename) throws SVGParseException, IOException, SAXException
+   {
+      SVG svg = SVG.getFromAsset(assetManager, filename);
+      addSVG(svg).id += (new File(filename)).getName().toLowerCase(Locale.getDefault());
+   }
+   
+   
+   /**
+    * Include an SVG as group
+    * 
+    * @param assetManager the AssetManager instance to use when reading the file.
+    * @param filename the filename of the SVG document within assets.
+    * @return an SVG instance on which you can call one of the render methods.
+    * @throws SAXException 
+    * @throws SVGParseException if there is an error parsing the document.
+    * @throws IOException if there is some IO error while reading the file.
+    */
+   public SVG.Group addSVG(SVG svg) throws SAXException
+   {
+      SVG.Group group = getGroupFromSVG(svg);
+      this.getRootElement().addChild(group);
+      return group;
+   }
+
+   /**
+    * Include an SVG as group
+    * 
+    * @param assetManager the AssetManager instance to use when reading the file.
+    * @param filename the filename of the SVG document within assets.
+    * @return 
+    * @return an SVG instance on which you can call one of the render methods.
+    * @throws SAXException 
+    * @throws SVGParseException if there is an error parsing the document.
+    * @throws IOException if there is some IO error while reading the file.
+    */
+   public SVG.Group addSVGAfter(SVG svg, SVG.SvgObject sibling) throws SAXException
+   {
+      SVG.Group group = getGroupFromSVG(svg);
+      group.addAfter(sibling);
+      return group;
+   }
+
+   /**
+    * Include an SVG as group
+    * 
+    * @param assetManager the AssetManager instance to use when reading the file.
+    * @param filename the filename of the SVG document within assets.
+    * @return an SVG instance on which you can call one of the render methods.
+    * @throws SVGParseException if there is an error parsing the document.
+    * @throws IOException if there is some IO error while reading the file.
+    */
+   public SVG.Group addSVGBefore(SVG svg, SVG.SvgObject sibling) throws SAXException
+   {
+      SVG.Group group = getGroupFromSVG(svg);
+      group.addBefore(sibling);
+      return group;
+   }
+
+   /**
+    * Include an SVG as group
+    * 
+    * @param assetManager the AssetManager instance to use when reading the file.
+    * @param filename the filename of the SVG document within assets.
+    * @return an SVG instance on which you can call one of the render methods.
+    * @throws SAXException 
+    * @throws SVGParseException if there is an error parsing the document.
+    * @throws IOException if there is some IO error while reading the file.
+    */
+   public SVG.Group addSVG(int index, SVG svg) throws SAXException
+   {
+      SVG.Group group = getGroupFromSVG(svg);
+      this.getRootElement().addChild(index, group);
+      return group;
+   }
+   
+   /*
+    * 
+    */
+   protected Group getGroupFromSVG(SVG svg) throws SAXException
+   {
+      Group group = new Group();
+      for(SVG.SvgObject child : svg.getRootElement().getChildren())
+      {
+         group.addChild(child);
+      }
+      return group;
+   }
+
 
    
    //===============================================================================
@@ -1762,7 +1927,7 @@ public class SVG
 
 
    // Any object that can be part of the tree
-   protected static class SvgObject
+   public abstract static class SvgObject
    {
 
 	  public SVG           document;
@@ -1954,14 +2119,14 @@ public class SVG
 
 
    // Any object in the tree that corresponds to an SVG element
-   protected static class SvgElement extends SvgElementBase
+   protected abstract static class SvgElement extends SvgElementBase
    {
       public Box  boundingBox = null;
    }
 
 
    // Any element that can appear inside a <switch> element.
-   protected interface SvgConditional
+   protected static interface SvgConditional
    {
       public void         setRequiredFeatures(Set<String> features);
       public Set<String>  getRequiredFeatures();
@@ -1977,7 +2142,7 @@ public class SVG
 
 
    // Any element that can appear inside a <switch> element.
-   protected static class  SvgConditionalElement extends SvgElement implements SvgConditional
+   protected abstract static class  SvgConditionalElement extends SvgElement implements SvgConditional
    {
       public Set<String>  requiredFeatures = new HashSet<String>();
       public String       requiredExtensions = null;
@@ -2018,7 +2183,7 @@ public class SVG
    }
 
 
-   protected static class SvgConditionalContainer extends SvgElement implements SvgContainer, SvgConditional
+   protected abstract static class SvgConditionalContainer extends SvgElement implements SvgContainer, SvgConditional
    {
       public List<SvgObject> children = new ArrayList<SvgObject>();
 
@@ -2062,12 +2227,12 @@ public class SVG
    }
 
 
-   protected interface HasTransform
+   protected static interface HasTransform
    {
       public void setTransform(Matrix matrix);
    }
 
-   protected interface IsColoriable
+   protected static interface IsColoriable
    {
 	     public void setStrokeNone();
 	     public void setStrokeColor(Integer color);
@@ -2089,13 +2254,13 @@ public class SVG
    }
    
 
-   protected static class SvgPreserveAspectRatioContainer extends SvgConditionalContainer
+   protected abstract static class SvgPreserveAspectRatioContainer extends SvgConditionalContainer
    {
       public PreserveAspectRatio  preserveAspectRatio = null;
    }
 
 
-   protected static class SvgViewBoxContainer extends SvgPreserveAspectRatioContainer
+   protected abstract static class SvgViewBoxContainer extends SvgPreserveAspectRatioContainer
    {
       public Box  viewBox;
    }
@@ -2145,7 +2310,7 @@ public class SVG
    }
 
 
-   protected interface NotDirectlyRendered
+   protected static interface NotDirectlyRendered
    {
    }
 
@@ -2450,12 +2615,12 @@ public class SVG
 
 
    // A root text container such as <text> or <textPath>
-   protected interface  TextRoot
+   protected static interface  TextRoot
    {
    }
    
 
-   protected interface  TextChild
+   protected static interface  TextChild
    {
       public void      setTextRoot(TextRoot obj);
       public TextRoot  getTextRoot();
@@ -3099,7 +3264,7 @@ public class SVG
    // Path definition
 
 
-   protected interface PathInterface
+   protected static interface PathInterface
    {
       public void  moveTo(float x, float y);
       public void  lineTo(float x, float y);

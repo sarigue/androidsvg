@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.ConcurrentModificationException;
 import java.util.Iterator;
 import java.util.List;
 
@@ -249,10 +250,26 @@ public class SVGImageView extends ImageView
       }
       synchronized (mOnDrawListener)
       {
-         for(Iterator<OnDrawListener> it = mOnDrawListener.iterator(); it.hasNext();)
+         int size = mOnDrawListener.size();
+         int i    = 0;
+         for(i=0; i < size ; i++)
          {
-            OnDrawListener listener = it.next();
-            listener.onDraw(canvas, moment);
+            try
+            {
+               OnDrawListener listener = mOnDrawListener.get(i);
+               listener.onDraw(canvas, moment);
+            }
+            catch(ConcurrentModificationException e)
+            {
+            }
+            catch(IndexOutOfBoundsException ee)
+            {
+               OnDrawListener listener = mOnDrawListener.get(i-1);
+               listener.onDraw(canvas, moment);
+            }
+            catch(Exception e)
+            {
+            }
          }
       }
    }

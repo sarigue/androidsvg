@@ -1,5 +1,7 @@
 package com.caverock.androidsvg.listeners;
 
+import java.util.List;
+
 import android.annotation.SuppressLint;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -136,7 +138,11 @@ public class SelectListener implements OnTouchListener
          {
             if (moment != OnDrawListener.AFTER_DRAW) return;
             canvas.drawRect(bounds, borderPaint);
-            view.getOnDrawListenerList().remove(this);
+            List<SVGImageView.OnDrawListener> list = view.getOnDrawListenerList();
+            synchronized (list)
+            {
+               list.remove(this);
+            }
          }
       };
       
