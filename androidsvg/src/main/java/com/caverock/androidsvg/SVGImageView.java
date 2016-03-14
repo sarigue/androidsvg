@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 
 import com.caverock.androidsvg.SVG.Box;
@@ -62,10 +64,11 @@ public class SVGImageView extends ImageView
 {
    
    public static interface OnDrawListener{
-      public void beforeTransform(Canvas canvas);
-      public void beforeDraw(Canvas canvas);
-      public void afterDraw(Canvas canvas);
-      public void afterRestore(Canvas canvas);
+      public static final int BEFORE_TRANSFORM = 1;
+      public static final int BEFORE_DRAW      = 2;
+      public static final int AFTER_DRAW       = 3;
+      public static final int AFTER_RESTORE    = 4;
+      public void onDraw(Canvas canvas, int moment);
    }
    
    private static Method      setLayerTypeMethod = null;
@@ -124,7 +127,7 @@ public class SVGImageView extends ImageView
    {
       if (mOnDrawListener == null)
       {
-         mOnDrawListener = new ArrayList<OnDrawListener>();
+         mOnDrawListener = Collections.synchronizedList(new ArrayList<OnDrawListener>());
       }
       return mOnDrawListener;
    }
@@ -219,54 +222,41 @@ public class SVGImageView extends ImageView
    protected void onDraw(Canvas canvas)
    {
       getImageMatrix().invert(mImageMatrixRevert);
-      if (mOnDrawListener != null)
-      {
-         synchronized(mOnDrawListener)
-         {
-            for(OnDrawListener listener : mOnDrawListener)
-               listener.beforeTransform(canvas);
-         }
-      }
-      
+      callOnDrawListener(canvas, OnDrawListener.BEFORE_TRANSFORM);
       if (mSvg != null)
       {
          canvas.save();
          canvas.setMatrix(getImageMatrix());
-         if (mOnDrawListener != null)
-         {
-            synchronized(mOnDrawListener)
-            {
-               for(OnDrawListener listener : mOnDrawListener)
-                  listener.beforeDraw(canvas);
-            }
-         }
+         callOnDrawListener(canvas, OnDrawListener.BEFORE_DRAW);
          getOnDrawRenderer(canvas).renderDocument(mSvg, null, null, true);
-         if (mOnDrawListener != null)
-         {
-            synchronized(mOnDrawListener)
-            {
-               for(OnDrawListener listener : mOnDrawListener)
-                  listener.afterDraw(canvas);
-            }
-         }
+         callOnDrawListener(canvas, OnDrawListener.AFTER_DRAW);
          canvas.restore();
       }
       else
       {
          super.onDraw(canvas);
       }
-      
-      if (mOnDrawListener != null)
-      {
-         synchronized(mOnDrawListener)
-         {
-            for(OnDrawListener listener : mOnDrawListener)
-               listener.afterRestore(canvas);
-         }
-      }
-      
+      callOnDrawListener(canvas, OnDrawListener.AFTER_RESTORE);
    }
 
+   
+   @SuppressLint("WrongCall")
+   protected void callOnDrawListener(Canvas canvas, int moment)
+   {
+      if (mOnDrawListener == null || mOnDrawListener.isEmpty())
+      {
+         return;
+      }
+      synchronized (mOnDrawListener)
+      {
+         for(Iterator<OnDrawListener> it = mOnDrawListener.iterator(); it.hasNext();)
+         {
+            OnDrawListener listener = it.next();
+            listener.onDraw(canvas, moment);
+         }
+      }
+   }
+   
    private SVGAndroidRenderer getOnDrawRenderer(Canvas canvas)
    {
       if (mRenderer == null) {

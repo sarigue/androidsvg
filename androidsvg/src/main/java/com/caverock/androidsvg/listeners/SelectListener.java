@@ -15,6 +15,7 @@ import android.view.View.OnTouchListener;
 import com.caverock.androidsvg.SVG;
 import com.caverock.androidsvg.SVGImageView;
 import com.caverock.androidsvg.SVGMeasure;
+import com.caverock.androidsvg.SVGImageView.OnDrawListener;
 
 public class SelectListener implements OnTouchListener
 {
@@ -33,12 +34,10 @@ public class SelectListener implements OnTouchListener
 	{
 		mImageView = imageView;
 		mImageView.getOnDrawListenerList().add(new SVGImageView.OnDrawListener() {
-	      @Override public void beforeTransform(Canvas canvas){};
-	      @Override public void beforeDraw(Canvas canvas){};
-	      @Override public void afterRestore(Canvas canvas){};
 	      @Override
-	      public void afterDraw(Canvas canvas)
+	      public void onDraw(Canvas canvas, int moment)
 	      {
+	         if (moment != OnDrawListener.AFTER_DRAW) return;
 	         if (mPaint != null && ! mBounds.isEmpty())
 	         {
 	            canvas.drawRect(mBounds, mPaint);
@@ -132,12 +131,10 @@ public class SelectListener implements OnTouchListener
       final Paint borderPaint = paint;
       
 	   SVGImageView.OnDrawListener l = new SVGImageView.OnDrawListener() {
-         @Override public void beforeTransform(Canvas canvas){};
-         @Override public void beforeDraw(Canvas canvas){};
-         @Override public void afterRestore(Canvas canvas){};
          @Override
-         public void afterDraw(Canvas canvas)
+         public void onDraw(Canvas canvas, int moment)
          {
+            if (moment != OnDrawListener.AFTER_DRAW) return;
             canvas.drawRect(bounds, borderPaint);
             view.getOnDrawListenerList().remove(this);
          }
