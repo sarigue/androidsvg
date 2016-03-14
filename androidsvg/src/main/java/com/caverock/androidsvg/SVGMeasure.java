@@ -114,11 +114,11 @@ public class SVGMeasure
       Matrix m = new Matrix();
       if (use.x != null)
       {
-         m.postTranslate(-bound.left + use.x.floatValue(renderer), 0);
+         m.postTranslate(use.x.floatValue(renderer), 0);
       }
       if (use.y != null)
       {
-         m.postTranslate(0, -bound.top + use.y.floatValue(renderer));
+         m.postTranslate(0, use.y.floatValue(renderer));
       }
       m.mapRect(bound);
       if (use.transform != null)
